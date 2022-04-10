@@ -1,0 +1,9 @@
+Place here any serverless.yml files separated by directory name. For example:
+
+01.stateful
+    serverless.yml
+02.stateless
+    serverless.yml
+
+Use the included "serverless-TEMPLATE.yml" as a template
+(rename it to "serverless.yml" once ready)

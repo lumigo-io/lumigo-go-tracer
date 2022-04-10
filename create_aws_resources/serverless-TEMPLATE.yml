@@ -1,0 +1,65 @@
+service:
+  name: <choose name that is no longer than 15 chars, otherwise things might break>
+
+custom: ${file(../../../utils/serverless_snippets/custom_section.yml)}
+
+provider:
+  name: aws
+  stage: ${self:custom.env}
+  region: ${opt:region, 'us-west-2'}
+  team: <team name>
+  stackName: ${self:custom.env}-${self:service.name}
+  runtime: python3.7 # set the default runtime
+  memorySize: 128 # set the default lambda memory size
+  layerAccount: ${opt:layer-account, '114300393969'}
+  layerVersion: ${opt:layer-version, '7'}
+  environment:
+    ENV: ${self:custom.env}
+    VERSION: ${file(../../.version.yml):version}
+    LUMIGO_SWITCH_OFF: ${opt:kill-switch, 'false'}
+    LUMIGO_TRACER_HOST: ${opt:edge_host, ''}
+    LUMIGO_DISABLE_CACHE: ${opt:lumigo-disable-cache, 'false'}
+    CONSISTENT_READ_DEFAULT: ${opt:consistent_read_default, 'false'}
+    GIT_ORGANIZATION: https://github.com/lumigo-io
+  stackTags: ${file(../../../utils/serverless_snippets/common_tags.yml)}
+  
+
+package:
+  individually: true
+  exclude:
+    - ../../** # exclude all the files in the directory, which will force you to include separately for each lambda
+
+functions:
+  my_name:
+    name: ${self:custom.prefix}_my_name
+    description: bla bla bla
+    handler: src/functions/my_name_function/my_name.handler
+    timeout: 60
+    memorySize: 128
+    tags:
+      resource-name: ${self:custom.prefix}_my_name
+    layers:
+      - arn:aws:lambda:${self:provider.region}:${self:provider.layerAccount}:layer:lumigo-python-backend-layer:${self:provider.layerVersion}
+    package:
+      include:
+        - ../../src/functions/my_name_function/**
+    iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:WriteItem"
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:Query"
+      Resource:
+        - ${cf:${self:custom.env}-stack-name.MyTable}
+
+resources:
+  Description: <ADD A DESCRIPTION OF YOUR STACK>
+
+plugins:
+  - serverless-python-requirements
+  - serverless-iam-roles-per-function
+  - serverless-lumigo
+  - serverless-prune-plugin
+  - serverless-plugin-git-variables
+  
