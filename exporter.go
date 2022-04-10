@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/lumigo-io/go-tracer-beta/internal/telemetry"
-	"github.com/lumigo-io/go-tracer-beta/internal/transform"
+	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
+	"github.com/lumigo-io/lumigo-go-tracer/internal/transform"
 	"github.com/pkg/errors"
 	"github.com/segmentio/ksuid"
 	"github.com/sirupsen/logrus"

@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/lumigo-io/go-tracer-beta/internal/telemetry"
+	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"

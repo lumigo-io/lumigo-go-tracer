@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/google/uuid"
-	lumigoctx "github.com/lumigo-io/go-tracer-beta/internal/context"
-	"github.com/lumigo-io/go-tracer-beta/internal/telemetry"
+	lumigoctx "github.com/lumigo-io/lumigo-go-tracer/internal/context"
+	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 

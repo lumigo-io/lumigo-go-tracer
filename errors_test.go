@@ -10,5 +10,5 @@ func TestTakeStackTrace(t *testing.T) {
 	stacktrace := takeStacktrace()
 	assert.Contains(t, stacktrace, "runtime.goexit")
 	assert.Contains(t, stacktrace, "testing.tRunner")
-	assert.Contains(t, stacktrace, "go-tracer-beta.TestTakeStackTrace")
+	assert.Contains(t, stacktrace, "lumigo-go-tracer.TestTakeStackTrace")
 }

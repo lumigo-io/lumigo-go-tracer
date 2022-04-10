@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go/aws"
-	lumigotracer "github.com/lumigo-io/go-tracer-beta"
+	lumigotracer "github.com/lumigo-io/lumigo-go-tracer"
 )
 
 type MyEvent struct {

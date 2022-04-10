@@ -1,20 +1,18 @@
-
-![CircleCI](https://circleci.com/gh/lumigo-io/go-tracer-beta/tree/master.svg?style=svg&circle-token=421fefe82bcad1c17c4116f154e25e32ebc90f2c)
-[![Go Report Card](https://goreportcard.com/badge/github.com/lumigo-io/go-tracer-beta)](https://goreportcard.com/report/github.com/lumigo-io/go-tracer-beta)
-[![codecov](https://codecov.io/gh/lumigo-io/go-tracer-beta/branch/master/graph/badge.svg?token=x49mnWnhaz)](https://codecov.io/gh/lumigo-io/go-tracer-beta)
-[![GoDoc](https://godoc.org/github.com/lumigo-io/go-tracer-beta?status.svg)](https://godoc.org/github.com/lumigo-io/go-tracer-beta)
-
+[![CircleCI](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master.svg?style=svg&circle-token=<CIRCLECI_TOKEN_PLACEHOLDER>)](https://circleci.com/gh/lumigo-io/<REPOSITORY_NAME>/tree/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/lumigo-io/lumigo-go-tracer)](https://goreportcard.com/report/github.com/lumigo-io/lumigo-go-tracer)
+[![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=<COVECOV_TOKEN_PLACEHOLDER>)](https://codecov.io/gh/lumigo-io/<REPOSITORY_NAME>)
+[![GoDoc](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer?status.svg)](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer)
 
 # go-tracer (BETA)
 
-This is lumigo/go-tracer-beta, Lumigo's Golang agent for distributed tracing and performance monitoring.
+This is lumigo/lumigo-go-tracer, Lumigo's Golang agent for distributed tracing and performance monitoring.
 
 ## Installation
 
-`go-tracer-beta` can be installed like any other Go library through `go get`:
+`lumigo-go-tracer` can be installed like any other Go library through `go get`:
 
 ```console
-$ go get github.com/lumigo-io/go-tracer-beta
+$ go get github.com/lumigo-io/lumigo-go-tracer
 ```
 
 Or, if you are already using
@@ -22,7 +20,7 @@ Or, if you are already using
 version number as well:
 
 ```console
-$ go get github.com/lumigo-io/go-tracer-beta@master
+$ go get github.com/lumigo-io/lumigo-go-tracer@master
 ```
 
 ## Configuration
@@ -42,7 +40,7 @@ You need a lumigo token which you can find under the `Project Settings` and `Tra
 import (
   //other imports
 
-  lumigotracer "github.com/lumigo-io/go-tracer-beta"
+  lumigotracer "github.com/lumigo-io/lumigo-go-tracer"
 )
 
 type MyEvent struct {

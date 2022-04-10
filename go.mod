@@ -1,4 +1,4 @@
-module github.com/lumigo-io/go-tracer-beta
+module github.com/lumigo-io/lumigo-go-tracer
 
 go 1.17
 

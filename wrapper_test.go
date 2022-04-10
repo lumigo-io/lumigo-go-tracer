@@ -313,8 +313,8 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 				assert.Equal(w.T(), testCase.expected.err.Error(), lumigoEnd.SpanError.Message)
 				assert.Equal(w.T(), reflect.TypeOf(testCase.expected.err).String(), lumigoEnd.SpanError.Type)
 
-				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "go-tracer-beta.WrapHandler.func1")
-				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "go-tracer-beta.(*wrapperTestSuite).TestLambdaHandlerE2ELocal.func7")
+				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "lumigo-go-tracer.WrapHandler.func1")
+				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "lumigo-go-tracer.(*wrapperTestSuite).TestLambdaHandlerE2ELocal.func7")
 			} else {
 				assert.NotNil(w.T(), lumigoEnd.LambdaResponse)
 				assert.Equal(w.T(), testCase.expected.val, *lumigoEnd.LambdaResponse)
