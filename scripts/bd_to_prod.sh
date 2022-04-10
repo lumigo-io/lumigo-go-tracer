@@ -1,8 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -eo pipefail
 
-pushd "$(dirname "$0")" &> /dev/null
-# Go back one spot because we are on scripts dir. The other scripts assume you are in the root folder
-cd ..
-../utils/common_bash/defaults/bd_to_prod.sh
-popd &> /dev/null
+go get -u github.com/stevenmatthewt/semantics
+
+TAG=$(semantics --output-tag)
+if [[ ! -z "$TAG" ]] ; then
+  git log --oneline > changelog.md
+  gh release create $TAG -F changelog.md
+else 
+  echo "The commit message is not major/minor/patch version"
+fi

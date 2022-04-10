@@ -1,4 +1,0 @@
---index-url https://1S9BuS-wK5jYoiF2ij7oqvdVnIGdwqtk:@pypi.fury.io/lumigo/
---extra-index-url https://pypi.org/simple/
-black==18.9b0
-pytest==5.2.1

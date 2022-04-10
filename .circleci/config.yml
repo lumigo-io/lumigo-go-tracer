@@ -1,13 +1,47 @@
 version: 2.1
+executors:
+  default:
+    docker:
+    - image: circleci/golang:1.17
 
 orbs:
+  gh: circleci/github-cli@1.0
   lumigo-orb: lumigo/lumigo-orb@volatile
 
+aliases:
+- &restore_cache
+  restore_cache:
+    key: go-mod-v1-{{ checksum "go.sum" }}
+- &save_cache
+  save_cache:
+    key: go-mod-v1-{{ checksum "go.sum" }}
+    paths:
+      - "/go/pkg/mod"
+
+jobs:
+  test:
+    executor:
+      name: default
+    steps:
+    - checkout
+    - *restore_cache
+    - run: make checks
+    - run: make upload-codecov
+    - *save_cache
+  
+  create-push-release:
+    executor:
+      name: default
+    steps:
+    - gh/setup
+    - checkout
+    - run: |
+        make release 
 
 workflows:
-  test-deploy:
+  ci-build:
     jobs:
-    - lumigo-orb/test:
+    - test:
         filters:
           branches:
             ignore: master
@@ -16,7 +50,7 @@ workflows:
           branches:
             ignore: master
         requires:
-          - lumigo-orb/test
+          - test
     - lumigo-orb/integration-test:
         deploy_spec: default
         tests_spec: testNormal
@@ -25,13 +59,16 @@ workflows:
             ignore: master
         requires:
           - lumigo-orb/be-deploy
-    - lumigo-orb/e2e-test:
-        requires:
-          - lumigo-orb/integration-test
+
+  master-build:
+    jobs:
+    - test:
         filters:
           branches:
-            ignore: master
-    - lumigo-orb/deploy:
+            only:
+            - master
+    - create-push-release:
         filters:
           branches:
-            only: master
+            only:
+            - master
