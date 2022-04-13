@@ -20,6 +20,19 @@ OUTDATED_VER := master
 OUTDATED_BIN := ./bin/go-mod-outdated
 OUTDATED_GEN := $(TOOLS_BIN_DIR)/$(OUTDATED_BIN)
 
+
+build-temp-dependencies:
+	rm -rf _original_dependency_files
+	mkdir _original_dependency_files
+	cp go.mod _original_dependency_files
+	cp go.sum _original_dependency_files
+	go mod tidy
+
+revert-temp-dependencies:
+	cp _original_dependency_files/go.mod .
+	cp _original_dependency_files/go.sum .
+	rm -rf _original_dependency_files
+
 .PHONY: build-relesae
 ## build-example: build the executable
 build-example:
@@ -31,7 +44,9 @@ build-e2e:
 	@echo Building example
 	mkdir -p e2e-tmp/
 	cp -r ${LAMBDA_E2E_DIR}/* e2e-tmp
+	$(MAKE) build-temp-dependencies
 	GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o ${LAMBDA_E2E_BIN_DIR}/otel ./e2e-tmp
+	$(MAKE) revert-temp-dependencies
 	rm -rf e2e-tmp
 
 .PHONY: deploy
