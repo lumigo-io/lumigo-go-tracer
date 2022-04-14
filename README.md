@@ -1,9 +1,7 @@
-
-![CircleCI](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master.svg?style=svg&circle-token=421fefe82bcad1c17c4116f154e25e32ebc90f2c)
+[![CircleCI](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master.svg?style=svg&circle-token=57743ad287dcba62c92f315898af5d20ac3f1569)](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/lumigo-io/lumigo-go-tracer)](https://goreportcard.com/report/github.com/lumigo-io/lumigo-go-tracer)
-[![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=x49mnWnhaz)](https://codecov.io/gh/lumigo-io/lumigo-go-tracer)
+[![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=BOtQ9Myp1t)](https://codecov.io/gh/lumigo-io/lumigo-go-tracer)
 [![GoDoc](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer?status.svg)](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer)
-
 
 # go-tracer (BETA)
 
@@ -169,4 +167,5 @@ Example commit message:
 
 `major: upgrade telemetry sdk`
 
-After merging, a new tag will be pushed on the previous available version. IN parallel a Github Release will be pushed automatically.
+After merging, a new tag will be pushed on the previous available version. IN parallel a Github Release will be pushed automatically. 
+
