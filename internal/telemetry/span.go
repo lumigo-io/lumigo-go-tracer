@@ -126,5 +126,9 @@ type Span struct {
 }
 
 func IsStartSpan(span sdktrace.ReadOnlySpan) bool {
-	return span.Name() == os.Getenv("AWS_LAMBDA_FUNCTION_NAME") || span.Name() == "HttpSpan"
+	return span.Name() == os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+}
+
+func IsEndSpan(span sdktrace.ReadOnlySpan) bool {
+	return span.Name() == "LumigoParentSpan"
 }

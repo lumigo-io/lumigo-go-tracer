@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +34,12 @@ func TestSetupExporterSuite(t *testing.T) {
 
 func (e *exporterTestSuite) TearDownTest() {
 	assert.NoError(e.T(), deleteAllFiles())
+	_ = os.Unsetenv("AWS_LAMBDA_FUNCTION_NAME")
+	_ = os.Unsetenv("AWS_REGION")
+	_ = os.Unsetenv("AWS_LAMBDA_LOG_STREAM_NAME")
+	_ = os.Unsetenv("AWS_LAMBDA_LOG_GROUP_NAME")
+	_ = os.Unsetenv("AWS_LAMBDA_FUNCTION_VERSION")
+	_ = os.Unsetenv("_X_AMZN_TRACE_ID")
 }
 
 func (e *exporterTestSuite) TestNilExporter() {
@@ -119,11 +126,11 @@ func (e *exporterTestSuite) TestExportSpans() {
 	container, err := readSpansFromFile()
 	assert.NoError(e.T(), err)
 
-	lumigoStart := container.startSpan[0]
+	lumigoStart := container.startFileSpans[0]
 	assert.Equal(e.T(), mockLambdaContext.AwsRequestID+"_started", lumigoStart.ID)
 	assert.Equal(e.T(), "account-id", lumigoStart.Account)
 
-	lumigoEnd := container.endSpan[0]
+	lumigoEnd := container.endFileSpans[0]
 	event := fmt.Sprint(endSpan.Attributes[0].Value.AsString())
 	response := fmt.Sprint(endSpan.Attributes[1].Value.AsString())
 	assert.Equal(e.T(), mockLambdaContext.AwsRequestID, lumigoEnd.ID)
@@ -134,9 +141,51 @@ func (e *exporterTestSuite) TestExportSpans() {
 
 }
 
+func (e *exporterTestSuite) TestExportSpansReachLimit() {
+	oldConfig := cfg.MaxSizeForRequest
+	cfg.MaxSizeForRequest = 1200
+	logger.Out = ioutil.Discard
+	os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
+	os.Setenv("AWS_REGION", "us-east-1")
+	spanID, _ := oteltrace.SpanIDFromHex("83887e5d7da921ba")
+	traceID, _ := oteltrace.TraceIDFromHex("83887e5d7da921ba")
+
+	spanCtx := oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		SpanID:  spanID,
+		TraceID: traceID,
+	})
+	startSpan := &tracetest.SpanStub{SpanContext: spanCtx}
+	httpSpan := &tracetest.SpanStub{Name: "httpSpan", SpanContext: spanCtx}
+	endSpan := &tracetest.SpanStub{Name: "LumigoParentSpan", SpanContext: spanCtx}
+
+	testContext := lambdacontext.NewContext(context.Background(), &mockLambdaContext)
+	exp, err := createExporter(false, testContext, logger)
+	assert.NoError(e.T(), err)
+
+	err = exp.ExportSpans(context.Background(), []trace.ReadOnlySpan{
+		startSpan.Snapshot(),
+	})
+	assert.NoError(e.T(), err)
+	for i := 0; i < 10; i++ {
+		err = exp.ExportSpans(context.Background(), []trace.ReadOnlySpan{
+			httpSpan.Snapshot(),
+		})
+		assert.NoError(e.T(), err)
+	}
+	err = exp.ExportSpans(context.Background(), []trace.ReadOnlySpan{
+		endSpan.Snapshot(),
+	})
+	assert.NoError(e.T(), err)
+	spans, err := readSpansFromFile()
+	assert.NoError(e.T(), err)
+	assert.Equal(e.T(), 4, len(spans.endFileSpans))
+	assert.NoError(e.T(), deleteAllFiles())
+	cfg.MaxSizeForRequest = oldConfig
+}
+
 type spanContainer struct {
-	startSpan []telemetry.Span
-	endSpan   []telemetry.Span
+	startFileSpans []telemetry.Span
+	endFileSpans   []telemetry.Span
 }
 
 func readSpansFromFile() (spanContainer, error) {
@@ -148,7 +197,8 @@ func readSpansFromFile() (spanContainer, error) {
 	var container spanContainer
 	for _, file := range files {
 		var spans []telemetry.Span
-		content, err := ioutil.ReadFile(fmt.Sprintf("%s/%s", SPANS_DIR, file.Name()))
+		filename := filepath.Join(SPANS_DIR, file.Name())
+		content, err := ioutil.ReadFile(filename)
 		if err != nil {
 			return spanContainer{}, err
 		}
@@ -157,10 +207,10 @@ func readSpansFromFile() (spanContainer, error) {
 			return spanContainer{}, err
 		}
 		if strings.Contains(file.Name(), "_span") {
-			container.startSpan = spans
+			container.startFileSpans = spans
 			continue
 		}
-		container.endSpan = spans
+		container.endFileSpans = spans
 	}
 	return container, nil
 }

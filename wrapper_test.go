@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/lambda/messages"
@@ -231,7 +232,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			expected: expected{`"Hello test!"`, nil},
 			handler: func(ctx context.Context, name string) (string, error) {
 				postBody, _ := json.Marshal(map[string]string{
-					"name": "test",
+					"name": strings.Repeat("test", 512),
 				})
 				r, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL, bytes.NewBuffer(postBody))
 				if err != nil {
@@ -239,7 +240,6 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 				}
 				r.Header.Set("Agent", "test")
 				c := &http.Client{Transport: NewTransport(http.DefaultTransport)}
-				ctxhttp.Do(context.Background(), c, r) // nolint
 
 				res, err := ctxhttp.Do(ctx, c, r)
 				if err != nil {
@@ -268,56 +268,61 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			spans, err := readSpansFromFile()
 			assert.NoError(w.T(), err)
 
-			lumigoStart := spans.startSpan[0]
-			assert.Equal(w.T(), "account-id", lumigoStart.Account)
-			assert.Equal(w.T(), "token", lumigoStart.Token)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_FUNCTION_NAME"), lumigoStart.LambdaName)
-			assert.Equal(w.T(), "go", lumigoStart.Runtime)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_STREAM_NAME"), lumigoStart.SpanInfo.LogStreamName)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_GROUP_NAME"), lumigoStart.SpanInfo.LogGroupName)
-			assert.Equal(w.T(), "1-5759e988-bd862e3fe1be46a994272793", lumigoStart.SpanInfo.TraceID.Root)
-			assert.Equal(w.T(), os.Getenv("AWS_REGION"), lumigoStart.Region)
-			assert.Equal(w.T(), "bd862e3fe1be46a994272793", lumigoStart.TransactionID)
-			assert.Equal(w.T(), string(inputPayload), lumigoStart.Event)
-			assert.Equal(w.T(), version, lumigoStart.SpanInfo.TracerVersion.Version)
-			if lumigoStart.LambdaType == "http" {
-				assert.NotNil(w.T(), lumigoStart.SpanInfo.HttpInfo)
-				assert.Equal(w.T(), ts.URL, fmt.Sprintf("http://%s", lumigoStart.SpanInfo.HttpInfo.Host))
-				assert.Equal(w.T(), fmt.Sprintf("%s/", ts.URL), lumigoStart.SpanInfo.HttpInfo.Request.URI)
-				assert.Equal(w.T(), "POST", lumigoStart.SpanInfo.HttpInfo.Request.Method)
-				assert.Equal(w.T(), `{\"name\": \"test\"}`, lumigoStart.SpanInfo.HttpInfo.Request.Body)
-				assert.Contains(w.T(), `"Agent": "test"`, lumigoStart.SpanInfo.HttpInfo.Request.Headers)
+			startFuncSpan := spans.startFileSpans[0]
+			assert.Equal(w.T(), "account-id", startFuncSpan.Account)
+			assert.Equal(w.T(), "token", startFuncSpan.Token)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_FUNCTION_NAME"), startFuncSpan.LambdaName)
+			assert.Equal(w.T(), "go", startFuncSpan.Runtime)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_STREAM_NAME"), startFuncSpan.SpanInfo.LogStreamName)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_GROUP_NAME"), startFuncSpan.SpanInfo.LogGroupName)
+			assert.Equal(w.T(), "1-5759e988-bd862e3fe1be46a994272793", startFuncSpan.SpanInfo.TraceID.Root)
+			assert.Equal(w.T(), os.Getenv("AWS_REGION"), startFuncSpan.Region)
+			assert.Equal(w.T(), "bd862e3fe1be46a994272793", startFuncSpan.TransactionID)
+			assert.Equal(w.T(), string(inputPayload), startFuncSpan.Event)
+			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
+
+			if len(spans.endFileSpans) > 1 {
+				httpSpan := spans.endFileSpans[0]
+				if httpSpan.LambdaType == "http" {
+					assert.NotNil(w.T(), httpSpan.SpanInfo.HttpInfo)
+					assert.Equal(w.T(), ts.URL, "http://"+httpSpan.SpanInfo.HttpInfo.Host)
+					assert.Equal(w.T(), ts.URL, "http://"+*httpSpan.SpanInfo.HttpInfo.Request.URI)
+					assert.Equal(w.T(), "POST", *httpSpan.SpanInfo.HttpInfo.Request.Method)
+					assert.Equal(w.T(), 2048, len(httpSpan.SpanInfo.HttpInfo.Request.Body))
+					assert.Contains(w.T(), httpSpan.SpanInfo.HttpInfo.Request.Body, `{"name":"test`)
+					assert.Contains(w.T(), httpSpan.SpanInfo.HttpInfo.Request.Headers, `"Agent":"test"`)
+				}
 			}
 
-			lumigoEnd := spans.endSpan[0]
-			assert.Equal(w.T(), "account-id", lumigoEnd.Account)
-			assert.Equal(w.T(), "token", lumigoEnd.Token)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_FUNCTION_NAME"), lumigoEnd.LambdaName)
-			assert.Equal(w.T(), "go", lumigoEnd.Runtime)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_STREAM_NAME"), lumigoEnd.SpanInfo.LogStreamName)
-			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_GROUP_NAME"), lumigoEnd.SpanInfo.LogGroupName)
-			assert.Equal(w.T(), "1-5759e988-bd862e3fe1be46a994272793", lumigoEnd.SpanInfo.TraceID.Root)
-			assert.Equal(w.T(), os.Getenv("AWS_REGION"), lumigoEnd.Region)
-			assert.Equal(w.T(), "bd862e3fe1be46a994272793", lumigoEnd.TransactionID)
-			assert.Equal(w.T(), string(inputPayload), lumigoEnd.Event)
-			assert.Equal(w.T(), version, lumigoStart.SpanInfo.TracerVersion.Version)
+			endFuncSpan := spans.endFileSpans[len(spans.endFileSpans)-1]
+			assert.Equal(w.T(), "account-id", endFuncSpan.Account)
+			assert.Equal(w.T(), "token", endFuncSpan.Token)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_FUNCTION_NAME"), endFuncSpan.LambdaName)
+			assert.Equal(w.T(), "go", endFuncSpan.Runtime)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_STREAM_NAME"), endFuncSpan.SpanInfo.LogStreamName)
+			assert.Equal(w.T(), os.Getenv("AWS_LAMBDA_LOG_GROUP_NAME"), endFuncSpan.SpanInfo.LogGroupName)
+			assert.Equal(w.T(), "1-5759e988-bd862e3fe1be46a994272793", endFuncSpan.SpanInfo.TraceID.Root)
+			assert.Equal(w.T(), os.Getenv("AWS_REGION"), endFuncSpan.Region)
+			assert.Equal(w.T(), "bd862e3fe1be46a994272793", endFuncSpan.TransactionID)
+			assert.Equal(w.T(), string(inputPayload), endFuncSpan.Event)
+			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
 
-			if lumigoStart.LambdaType == "http" {
-				assert.Equal(w.T(), 200, lumigoStart.SpanInfo.HttpInfo.Response.StatusCode)
-				assert.Equal(w.T(), `Hello, world!`, lumigoStart.SpanInfo.HttpInfo.Response.Body)
-				assert.Contains(w.T(), `"Content-Length": "13"`, lumigoStart.SpanInfo.HttpInfo.Response.Headers)
+			if startFuncSpan.LambdaType == "http" {
+				assert.Equal(w.T(), 200, startFuncSpan.SpanInfo.HttpInfo.Response.StatusCode)
+				assert.Equal(w.T(), `Hello, world!`, startFuncSpan.SpanInfo.HttpInfo.Response.Body)
+				assert.Contains(w.T(), `"Content-Length": "13"`, startFuncSpan.SpanInfo.HttpInfo.Response.Headers)
 			}
 
 			if testCase.expected.err != nil {
-				assert.NotNil(w.T(), lumigoEnd.SpanError)
-				assert.Equal(w.T(), testCase.expected.err.Error(), lumigoEnd.SpanError.Message)
-				assert.Equal(w.T(), reflect.TypeOf(testCase.expected.err).String(), lumigoEnd.SpanError.Type)
+				assert.NotNil(w.T(), endFuncSpan.SpanError)
+				assert.Equal(w.T(), testCase.expected.err.Error(), endFuncSpan.SpanError.Message)
+				assert.Equal(w.T(), reflect.TypeOf(testCase.expected.err).String(), endFuncSpan.SpanError.Type)
 
-				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "lumigo-go-tracer.WrapHandler.func1")
-				assert.Contains(t, lumigoEnd.SpanError.Stacktrace, "lumigo-go-tracer.(*wrapperTestSuite).TestLambdaHandlerE2ELocal.func7")
+				assert.Contains(t, endFuncSpan.SpanError.Stacktrace, "lumigo-go-tracer.WrapHandler.func1")
+				assert.Contains(t, endFuncSpan.SpanError.Stacktrace, "lumigo-go-tracer.(*wrapperTestSuite).TestLambdaHandlerE2ELocal.func7")
 			} else {
-				assert.NotNil(w.T(), lumigoEnd.LambdaResponse)
-				assert.Equal(w.T(), testCase.expected.val, *lumigoEnd.LambdaResponse)
+				assert.NotNil(w.T(), endFuncSpan.LambdaResponse)
+				assert.Equal(w.T(), testCase.expected.val, *endFuncSpan.LambdaResponse)
 			}
 		})
 
