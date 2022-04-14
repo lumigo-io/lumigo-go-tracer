@@ -42,6 +42,7 @@ func NewTracer(ctx context.Context, cfg Config, payload json.RawMessage) (retTra
 	}
 	retTracer.eventData = data
 
+	// TODO: maybe switch WithSyncer to WithBatcher
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(exporter),
 		sdktrace.WithResource(newResource(ctx,

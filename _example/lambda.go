@@ -68,7 +68,7 @@ func HandleRequest(ctx context.Context, name MyEvent) (events.APIGatewayProxyRes
 func main() {
 	os.Setenv("LUMIGO_DEBUG", "true")
 	wrappedHandler := lumigotracer.WrapHandler(HandleRequest, &lumigotracer.Config{
-		Token: "<insert your token>",
+		Token: "t_f2956385a53a4dcb9aea0",
 	})
 	lambda.Start(wrappedHandler)
 }

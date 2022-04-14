@@ -38,13 +38,17 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	span.SetAttributes(semconv.HTTPTargetKey.String(req.URL.Path))
 	span.SetAttributes(semconv.HTTPHostKey.String(req.URL.Host))
 	t.propagator.Inject(traceCtx, propagation.HeaderCarrier(req.Header))
-
 	if req.Body != nil {
 		bodyBytes, bodyErr := io.ReadAll(req.Body)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse request body")
 		}
-		span.SetAttributes(attribute.String("http.request_body", string(bodyBytes)))
+
+		if len(bodyBytes) > cfg.MaxEntrySize {
+			span.SetAttributes(attribute.String("http.request_body", string(bodyBytes[:cfg.MaxEntrySize])))
+		} else {
+			span.SetAttributes(attribute.String("http.request_body", string(bodyBytes)))
+		}
 		// restore body
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
@@ -59,10 +63,17 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	if err != nil {
 		logger.WithError(err).Error("failed to fetch request headers")
 	}
-	span.SetAttributes(attribute.String("http.request_headers", string(headersJson)))
+	reqHeaderString := string(headersJson)
+	if len(reqHeaderString) > cfg.MaxEntrySize {
+		span.SetAttributes(attribute.String("http.request_headers", string(reqHeaderString[:cfg.MaxEntrySize])))
+	} else {
+		span.SetAttributes(attribute.String("http.request_headers", string(reqHeaderString)))
+	}
 
 	resp, err = t.rt.RoundTrip(req)
-
+	if resp == nil {
+		return nil, err
+	}
 	// response
 	span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
 	span.SetStatus(semconv.SpanStatusFromHTTPStatusCode(resp.StatusCode))
@@ -77,14 +88,23 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	if jsonErr != nil {
 		logger.WithError(err).Error("failed to fetch response headers")
 	}
-	span.SetAttributes(attribute.String("http.response_headers", string(headersJson)))
+	if len(headersJson) > cfg.MaxEntrySize {
+		span.SetAttributes(attribute.String("http.response_headers", string(headersJson[:cfg.MaxEntrySize])))
+	} else {
+		span.SetAttributes(attribute.String("http.response_headers", string(headersJson)))
+	}
 
 	if resp.Body != nil {
 		bodyBytes, bodyErr := io.ReadAll(resp.Body)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse response body")
 		}
-		span.SetAttributes(attribute.String("http.response_body", string(bodyBytes)))
+		if len(bodyBytes) > cfg.MaxEntrySize {
+			span.SetAttributes(attribute.String("http.response_body", string(bodyBytes[:cfg.MaxEntrySize])))
+		} else {
+			span.SetAttributes(attribute.String("http.response_body", string(bodyBytes)))
+		}
+
 		resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 	resp.Body = &wrappedBody{ctx: traceCtx, span: span, body: resp.Body}
