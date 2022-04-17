@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
@@ -17,9 +18,11 @@ import (
 
 // Exporter exports OpenTelemetry data to Lumigo.
 type Exporter struct {
-	context   context.Context
-	logger    logrus.FieldLogger
-	encoderMu sync.Mutex
+	spansTotalSizeBytes int
+	lumigoSpans         []telemetry.Span
+	context             context.Context
+	logger              logrus.FieldLogger
+	encoderMu           sync.Mutex
 
 	stoppedMu sync.RWMutex
 	stopped   bool
@@ -28,8 +31,9 @@ type Exporter struct {
 // newExporter creates an Exporter with the passed options.
 func newExporter(ctx context.Context, logger logrus.FieldLogger) (*Exporter, error) {
 	return &Exporter{
-		logger:  logger,
-		context: ctx,
+		logger:      logger,
+		context:     ctx,
+		lumigoSpans: []telemetry.Span{},
 	}, nil
 }
 
@@ -49,28 +53,34 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 		return nil
 	}
 
-	var lumigoSpans []telemetry.Span
 	e.encoderMu.Lock()
 	defer e.encoderMu.Unlock()
 	for _, span := range spans {
 		mapper := transform.NewMapper(e.context, span, logger)
 		lumigoSpan := mapper.Transform()
-		if telemetry.IsStartSpan(span) {
+
+		if telemetry.IsEndSpan(span) {
+			e.lumigoSpans = append(e.lumigoSpans, lumigoSpan)
+			e.logger.Info("writing end span and http spans")
+			if err := writeSpan(e.lumigoSpans, false); err != nil {
+				return errors.Wrap(err, "failed to store end span and http spans")
+			}
+			return nil
+		} else if telemetry.IsStartSpan(span) {
 			e.logger.Info("writing start span")
 			if err := writeSpan([]telemetry.Span{lumigoSpan}, true); err != nil {
 				return errors.Wrap(err, "failed to store startSpan")
 			}
 			continue
 		}
-		lumigoSpans = append(lumigoSpans, lumigoSpan)
-	}
 
-	if len(lumigoSpans) == 0 {
-		return nil
-	}
-	e.logger.Info("writing end span")
-	if err := writeSpan(lumigoSpans, false); err != nil {
-		return errors.Wrap(err, "failed to store endSpan")
+		spanSize := int(reflect.TypeOf(lumigoSpan).Size())
+		if e.spansTotalSizeBytes+spanSize > cfg.MaxSizeForRequest {
+			e.logger.Warn("spans total size is bigger than max size")
+			continue
+		}
+		e.spansTotalSizeBytes += spanSize
+		e.lumigoSpans = append(e.lumigoSpans, lumigoSpan)
 	}
 	return nil
 }

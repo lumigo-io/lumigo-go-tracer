@@ -26,3 +26,7 @@ build/_output/*
 dist/
 *.zip
 bin
+
+# vs code
+.DS_Store
+*/.DS_Store

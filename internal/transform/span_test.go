@@ -310,6 +310,7 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
+				ParentID:         mockLambdaContext.AwsRequestID,
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 				SpanInfo: telemetry.SpanInfo{
