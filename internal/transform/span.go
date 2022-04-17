@@ -97,6 +97,7 @@ func (m *mapper) Transform() telemetry.Span {
 		if lambdaType == "http" {
 			spanID, _ := uuid.NewUUID()
 			lumigoSpan.ID = spanID.String()
+			lumigoSpan.ParentID = lambdaCtx.AwsRequestID
 		} else {
 			lumigoSpan.ID = lambdaCtx.AwsRequestID
 		}
