@@ -19,6 +19,7 @@ import (
 // Exporter exports OpenTelemetry data to Lumigo.
 type Exporter struct {
 	spansTotalSizeBytes int
+	lumigoStartSpan     telemetry.Span
 	lumigoSpans         []telemetry.Span
 	context             context.Context
 	logger              logrus.FieldLogger
@@ -57,7 +58,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 	defer e.encoderMu.Unlock()
 	for _, span := range spans {
 		mapper := transform.NewMapper(e.context, span, logger)
-		lumigoSpan := mapper.Transform()
+		lumigoSpan := mapper.Transform(e.lumigoStartSpan.StartedTimestamp)
 
 		if telemetry.IsEndSpan(span) {
 			e.lumigoSpans = append(e.lumigoSpans, lumigoSpan)
@@ -68,6 +69,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 			return nil
 		} else if telemetry.IsStartSpan(span) {
 			e.logger.Info("writing start span")
+			e.lumigoStartSpan = lumigoSpan
 			if err := writeSpan([]telemetry.Span{lumigoSpan}, true); err != nil {
 				return errors.Wrap(err, "failed to store startSpan")
 			}
