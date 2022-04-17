@@ -47,8 +47,6 @@ func TestTransport(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.testname, func(t *testing.T) {
-			// tr := NewTransport(http.DefaultTransport)
-
 			c := http.Client{Transport: tc.transport}
 			res, err := c.Do(r)
 			if err != nil {
