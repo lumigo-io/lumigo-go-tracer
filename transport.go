@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"go.opentelemetry.io/otel"
@@ -38,77 +37,71 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	span.SetAttributes(semconv.HTTPTargetKey.String(req.URL.Path))
 	span.SetAttributes(semconv.HTTPHostKey.String(req.URL.Host))
 	t.propagator.Inject(traceCtx, propagation.HeaderCarrier(req.Header))
-	if req.Body != nil {
-		bodyBytes, bodyErr := io.ReadAll(req.Body)
-		if bodyErr != nil {
-			logger.WithError(bodyErr).Error("failed to parse request body")
-		}
-
-		if len(bodyBytes) > cfg.MaxEntrySize {
-			span.SetAttributes(attribute.String("http.request_body", string(bodyBytes[:cfg.MaxEntrySize])))
-		} else {
-			span.SetAttributes(attribute.String("http.request_body", string(bodyBytes)))
-		}
-		// restore body
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-	}
-
-	reqHeaders := make(map[string]string)
-	for k, values := range req.Header {
-		for _, value := range values {
-			reqHeaders[k] = value
-		}
-	}
-	headersJson, err := json.Marshal(reqHeaders)
-	if err != nil {
-		logger.WithError(err).Error("failed to fetch request headers")
-	}
-	reqHeaderString := string(headersJson)
-	if len(reqHeaderString) > cfg.MaxEntrySize {
-		span.SetAttributes(attribute.String("http.request_headers", string(reqHeaderString[:cfg.MaxEntrySize])))
-	} else {
-		span.SetAttributes(attribute.String("http.request_headers", string(reqHeaderString)))
-	}
-
+	req, span = addRequestDataToSpanAndWrap(req, span)
 	resp, err = t.rt.RoundTrip(req)
 	if resp == nil {
 		return nil, err
 	}
-	// response
 	span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
 	span.SetStatus(semconv.SpanStatusFromHTTPStatusCode(resp.StatusCode))
+	resp, span = addResponseDataToSpanAndWrap(resp, span)
 
-	responseHeaders := make(map[string]string)
-	for k, values := range resp.Header {
-		for _, value := range values {
-			responseHeaders[k] = value
-		}
-	}
-	headersJson, jsonErr := json.Marshal(responseHeaders)
-	if jsonErr != nil {
-		logger.WithError(err).Error("failed to fetch response headers")
-	}
-	if len(headersJson) > cfg.MaxEntrySize {
-		span.SetAttributes(attribute.String("http.response_headers", string(headersJson[:cfg.MaxEntrySize])))
-	} else {
-		span.SetAttributes(attribute.String("http.response_headers", string(headersJson)))
-	}
+	resp.Body = &wrappedBody{ctx: traceCtx, span: span, body: resp.Body}
+	return resp, err
+}
 
-	if resp.Body != nil {
-		bodyBytes, bodyErr := io.ReadAll(resp.Body)
+func addRequestDataToSpanAndWrap(req *http.Request, span trace.Span) (*http.Request, trace.Span) {
+	req.Body, span = addBodyToSpan(req.Body, span, "http.request_body")
+	span = addHeaderToSpan(req.Header, span, "http.request_headers")
+	return req, span
+}
+
+func addResponseDataToSpanAndWrap(resp *http.Response, span trace.Span) (*http.Response, trace.Span) {
+	resp.Body, span = addBodyToSpan(resp.Body, span, "http.response_body")
+	span = addHeaderToSpan(resp.Header, span, "http.response_headers")
+	return resp, span
+}
+
+func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io.ReadCloser, trace.Span) {
+	if body != nil {
+		bodyStr, bodyReadCloser, bodyErr := getFirstNCharsFromReadCloser(body, cfg.MaxEntrySize)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse response body")
 		}
-		if len(bodyBytes) > cfg.MaxEntrySize {
-			span.SetAttributes(attribute.String("http.response_body", string(bodyBytes[:cfg.MaxEntrySize])))
-		} else {
-			span.SetAttributes(attribute.String("http.response_body", string(bodyBytes)))
-		}
-
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		span.SetAttributes(attribute.String(attributeKey, bodyStr))
+		body = bodyReadCloser
 	}
-	resp.Body = &wrappedBody{ctx: traceCtx, span: span, body: resp.Body}
-	return resp, err
+	return body, span
+}
+
+func addHeaderToSpan(srcHeaders http.Header, span trace.Span, attributeKey string) trace.Span {
+	headers := make(map[string]string)
+	for k, values := range srcHeaders {
+		for _, value := range values {
+			headers[k] = value
+		}
+	}
+	headersJson, jsonErr := json.Marshal(headers)
+	if jsonErr != nil {
+		logger.WithError(jsonErr).Error("failed to fetch request headers")
+	}
+	if len(headersJson) > cfg.MaxEntrySize {
+		span.SetAttributes(attribute.String(attributeKey, string(headersJson[:cfg.MaxEntrySize])))
+	} else {
+		span.SetAttributes(attribute.String(attributeKey, string(headersJson)))
+	}
+	return span
+}
+
+func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadCloser, error) {
+	buf := make([]byte, n)
+	n, err := rc.Read(buf)
+	if err == io.EOF {
+		return string(buf), io.NopCloser(bytes.NewReader(buf[:n])), nil
+	} else if err != nil {
+		return "", nil, err
+	}
+	return string(buf), newMultiReadCloser(bytes.NewReader(buf), rc), nil
 }
 
 type wrappedBody struct {
@@ -117,7 +110,7 @@ type wrappedBody struct {
 	body io.ReadCloser
 }
 
-var _ io.ReadCloser = &wrappedBody{}
+// var _ io.ReadCloser = &wrappedBody{} // TODO: WTF?
 
 func (wb *wrappedBody) Read(b []byte) (int, error) {
 	n, err := wb.body.Read(b)
@@ -126,7 +119,7 @@ func (wb *wrappedBody) Read(b []byte) (int, error) {
 	case nil:
 		// nothing to do here but fall through to the return
 	case io.EOF:
-		wb.span.End()
+		wb.span.End() // TODO: why do we need to end the span twice?
 	default:
 		wb.span.RecordError(err)
 		wb.span.SetStatus(codes.Error, err.Error())
@@ -137,4 +130,24 @@ func (wb *wrappedBody) Read(b []byte) (int, error) {
 func (wb *wrappedBody) Close() error {
 	wb.span.End()
 	return wb.body.Close()
+}
+
+func newMultiReadCloser(tail io.Reader, rc io.ReadCloser) io.ReadCloser {
+	return &multiReadCloser{
+		reader: io.MultiReader(tail, rc),
+		closer: rc,
+	}
+}
+
+type multiReadCloser struct {
+	reader io.Reader
+	closer io.Closer
+}
+
+func (mrc *multiReadCloser) Read(b []byte) (int, error) {
+	return mrc.reader.Read(b)
+}
+
+func (mrc *multiReadCloser) Close() error {
+	return mrc.closer.Close()
 }

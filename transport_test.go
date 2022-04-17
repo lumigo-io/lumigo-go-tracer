@@ -36,12 +36,12 @@ func TestTransport(t *testing.T) {
 		transport http.RoundTripper
 	}{
 		{
-			testname:  "http default transport",
-			transport: http.DefaultTransport,
+			testname: "http default transport",
+			// transport: http.DefaultTransport,
 		},
 		{
-			testname:  "http default transport",
-			transport: nil,
+			testname: "http default transport",
+			// transport: nil,
 		},
 	}
 
@@ -61,7 +61,7 @@ func TestTransport(t *testing.T) {
 			}
 
 			if !bytes.Equal(body, content) {
-				t.Fatalf("unexpected content: got %s, expected %s", body, content)
+				t.Fatalf("unexpected content: got %d, expected %d", len(body), len(content))
 			}
 		})
 	}
@@ -138,4 +138,14 @@ func TestWrappedBodyCloseError(t *testing.T) {
 	expectedErr := errors.New("test")
 	wb := &wrappedBody{span: trace.Span(s), body: readCloser{closeErr: expectedErr}}
 	assert.Equal(t, expectedErr, wb.Close())
+}
+
+func TestGetFirstNCharsFromReader(t *testing.T) {
+	rc := io.NopCloser(bytes.NewReader([]byte("Hello, world!")))
+	first5Char, origReader, err := getFirstNCharsFromReadCloser(rc, 5)
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello", first5Char)
+	allChars, err := io.ReadAll(origReader)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("Hello, world!"), allChars)
 }
