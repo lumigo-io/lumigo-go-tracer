@@ -36,20 +36,20 @@ func TestTransport(t *testing.T) {
 		transport http.RoundTripper
 	}{
 		{
-			testname: "http default transport",
-			// transport: http.DefaultTransport,
+			testname:  "http default transport",
+			transport: http.DefaultTransport,
 		},
 		{
-			testname: "http default transport",
-			// transport: nil,
+			testname:  "http default transport",
+			transport: nil,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.testname, func(t *testing.T) {
-			tr := NewTransport(http.DefaultTransport)
+			// tr := NewTransport(http.DefaultTransport)
 
-			c := http.Client{Transport: tr}
+			c := http.Client{Transport: tc.transport}
 			res, err := c.Do(r)
 			if err != nil {
 				t.Fatal(err)
