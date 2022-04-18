@@ -35,7 +35,7 @@ func NewMapper(ctx context.Context, span sdktrace.ReadOnlySpan, logger logrus.Fi
 	}
 }
 
-func (m *mapper) Transform() telemetry.Span {
+func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	numAttrs := len(m.span.Attributes()) + m.span.Resource().Len() + 2
 
 	if m.span.SpanKind() != apitrace.SpanKindUnspecified {
@@ -59,8 +59,12 @@ func (m *mapper) Transform() telemetry.Span {
 		attrs["m.span.kind"] = strings.ToLower(m.span.SpanKind().String())
 	}
 
+	startTime := m.span.StartTime().UnixMilli()
+	if telemetry.IsEndSpan(m.span) {
+		startTime = invocationStartedTimestamp
+	}
 	lumigoSpan := telemetry.Span{
-		StartedTimestamp: m.span.StartTime().UnixMilli(),
+		StartedTimestamp: startTime,
 		EndedTimestamp:   m.span.EndTime().UnixMilli(),
 	}
 

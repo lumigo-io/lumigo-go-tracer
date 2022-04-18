@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -344,7 +345,11 @@ func TestTransform(t *testing.T) {
 	for _, tc := range testcases {
 		tc.before()
 		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New())
-		lumigoSpan := mapper.Transform()
+		invocationStartedTimestamp := now.UnixMilli()
+		if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
+			invocationStartedTimestamp = 0
+		}
+		lumigoSpan := mapper.Transform(invocationStartedTimestamp)
 		// intentionally ignore CI and Local envs
 		lumigoSpan.LambdaEnvVars = ""
 		// intentionally ignore generated LambdaContainerID

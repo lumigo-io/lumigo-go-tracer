@@ -129,6 +129,7 @@ func (e *exporterTestSuite) TestExportSpans() {
 	lumigoStart := container.startFileSpans[0]
 	assert.Equal(e.T(), mockLambdaContext.AwsRequestID+"_started", lumigoStart.ID)
 	assert.Equal(e.T(), "account-id", lumigoStart.Account)
+	assert.Equal(e.T(), lumigoStart.StartedTimestamp, startSpan.StartTime.UnixMilli())
 
 	lumigoEnd := container.endFileSpans[0]
 	event := fmt.Sprint(endSpan.Attributes[0].Value.AsString())
@@ -138,7 +139,7 @@ func (e *exporterTestSuite) TestExportSpans() {
 	assert.Equal(e.T(), aws.String(response), lumigoEnd.LambdaResponse)
 	assert.Equal(e.T(), endSpan.Resource.Attributes()[0].Value.AsString(), lumigoEnd.Region)
 	assert.Equal(e.T(), endSpan.Resource.Attributes()[1].Value.AsString(), lumigoEnd.Token)
-
+	assert.Equal(e.T(), lumigoEnd.StartedTimestamp, lumigoStart.StartedTimestamp)
 }
 
 func (e *exporterTestSuite) TestExportSpansReachLimit() {
