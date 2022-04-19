@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func TestTransport(t *testing.T) {
@@ -32,110 +29,41 @@ func TestTransport(t *testing.T) {
 	}
 
 	testcases := []struct {
-		testname  string
-		transport http.RoundTripper
+		testname string
+		readFunc func(body io.ReadCloser) ([]byte, error)
+		expected []byte
 	}{
 		{
-			testname:  "http default transport",
-			transport: http.DefaultTransport,
+			testname: "read all",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return io.ReadAll(body) },
+			expected: []byte("Hello, world!"),
 		},
 		{
-			testname:  "http default transport",
-			transport: nil,
+			testname: "partial read",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return io.ReadAll(io.LimitReader(body, 5)) },
+			expected: []byte("Hello"),
+		},
+		{
+			testname: "no read",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return []byte{}, nil },
+			expected: []byte{},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.testname, func(t *testing.T) {
-			c := http.Client{Transport: tc.transport}
+			c := http.Client{Transport: NewTransport(http.DefaultTransport)}
 			res, err := c.Do(r)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(t, err)
 
-			body, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
+			body, err := tc.readFunc(res.Body)
+			assert.NoError(t, err)
+			defer res.Body.Close()
+			assert.Equal(t, tc.expected, body)
+			// span := getSpan(t)
 
-			if !bytes.Equal(body, content) {
-				t.Fatalf("unexpected content: got %d, expected %d", len(body), len(content))
-			}
 		})
 	}
-}
-
-const readSize = 42
-
-type readCloser struct {
-	readErr, closeErr error
-}
-
-func (rc readCloser) Read(p []byte) (n int, err error) {
-	return readSize, rc.readErr
-}
-func (rc readCloser) Close() error {
-	return rc.closeErr
-}
-
-type span struct {
-	trace.Span
-
-	ended       bool
-	recordedErr error
-
-	statusCode codes.Code
-	statusDesc string
-}
-
-func (s *span) End(...trace.SpanEndOption) {
-	s.ended = true
-}
-
-func (s *span) RecordError(err error, _ ...trace.EventOption) {
-	s.recordedErr = err
-}
-
-func (s *span) SetStatus(c codes.Code, d string) {
-	s.statusCode, s.statusDesc = c, d
-}
-
-func TestWrappedBodyRead(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
-	assert.NoError(t, err)
-}
-
-func TestWrappedBodyReadEOFError(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{readErr: io.EOF}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
-	assert.Equal(t, io.EOF, err)
-}
-
-func TestWrappedBodyReadError(t *testing.T) {
-	s := new(span)
-	expectedErr := errors.New("test")
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{readErr: expectedErr}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
-	assert.Equal(t, expectedErr, err)
-}
-
-func TestWrappedBodyClose(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{}}
-	assert.NoError(t, wb.Close())
-}
-
-func TestWrappedBodyCloseError(t *testing.T) {
-	s := new(span)
-	expectedErr := errors.New("test")
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{closeErr: expectedErr}}
-	assert.Equal(t, expectedErr, wb.Close())
 }
 
 func TestGetFirstNCharsFromReader(t *testing.T) {
@@ -149,17 +77,21 @@ func TestGetFirstNCharsFromReader(t *testing.T) {
 }
 
 func TestGetFirstNCharsFromReaderWithErr(t *testing.T) {
-	rc := &testReadCloser{}
+	rc := &readCloser{readErr: errors.New("test")}
 	first5Char, _, err := getFirstNCharsFromReadCloser(rc, 5)
 	assert.Error(t, err)
 	assert.Equal(t, "", first5Char)
 }
 
-type testReadCloser struct{}
+const readSize = 42
 
-func (trc *testReadCloser) Read(p []byte) (n int, err error) {
-	return 0, errors.New("test")
+type readCloser struct {
+	readErr, closeErr error
 }
-func (trc *testReadCloser) Close() error {
-	return nil
+
+func (rc readCloser) Read(p []byte) (n int, err error) {
+	return readSize, rc.readErr
+}
+func (rc readCloser) Close() error {
+	return rc.closeErr
 }
