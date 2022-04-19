@@ -62,6 +62,7 @@ func addResponseDataToSpanAndWrap(resp *http.Response, span trace.Span) (*http.R
 
 func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io.ReadCloser, trace.Span) {
 	if body != nil {
+		logger.Info("adding body to span")
 		bodyStr, bodyReadCloser, bodyErr := getFirstNCharsFromReadCloser(body, cfg.MaxEntrySize)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse response body")
