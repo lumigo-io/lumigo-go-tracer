@@ -67,8 +67,10 @@ func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io
 		bodyStr, bodyReadCloser, bodyErr := getFirstNCharsFromReadCloser(body, cfg.MaxEntrySize)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse response body")
+			span.SetAttributes(attribute.String(attributeKey, ""))
+		} else {
+			span.SetAttributes(attribute.String(attributeKey, bodyStr))
 		}
-		span.SetAttributes(attribute.String(attributeKey, bodyStr))
 		body = bodyReadCloser
 	}
 	return body, span
@@ -97,9 +99,9 @@ func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadClose
 	buf := make([]byte, n)
 	n, err := rc.Read(buf)
 	if err == io.EOF {
-		return string(buf), io.NopCloser(bytes.NewReader(buf[:n])), nil
+		return string(buf[:n]), io.NopCloser(bytes.NewReader(buf[:n])), nil
 	} else if err != nil {
-		return "", nil, err
+		return "", rc, err
 	}
 	return string(buf), newMultiReadCloser(bytes.NewReader(buf), rc), nil
 }
@@ -110,8 +112,6 @@ type wrappedBody struct {
 	body io.ReadCloser
 }
 
-// var _ io.ReadCloser = &wrappedBody{} // TODO: WTF?
-
 func (wb *wrappedBody) Read(b []byte) (int, error) {
 	n, err := wb.body.Read(b)
 
@@ -119,7 +119,7 @@ func (wb *wrappedBody) Read(b []byte) (int, error) {
 	case nil:
 		// nothing to do here but fall through to the return
 	case io.EOF:
-		wb.span.End() // TODO: why do we need to end the span twice?
+		wb.span.End()
 	default:
 		wb.span.RecordError(err)
 		wb.span.SetStatus(codes.Error, err.Error())

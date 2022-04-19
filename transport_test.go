@@ -147,3 +147,19 @@ func TestGetFirstNCharsFromReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("Hello, world!"), allChars)
 }
+
+func TestGetFirstNCharsFromReaderWithErr(t *testing.T) {
+	rc := &testReadCloser{}
+	first5Char, _, err := getFirstNCharsFromReadCloser(rc, 5)
+	assert.Error(t, err)
+	assert.Equal(t, "", first5Char)
+}
+
+type testReadCloser struct{}
+
+func (trc *testReadCloser) Read(p []byte) (n int, err error) {
+	return 0, errors.New("test")
+}
+func (trc *testReadCloser) Close() error {
+	return nil
+}
