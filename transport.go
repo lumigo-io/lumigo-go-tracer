@@ -97,10 +97,10 @@ func addHeaderToSpan(srcHeaders http.Header, span trace.Span, attributeKey strin
 
 func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadCloser, error) {
 	buf := make([]byte, n)
-	n, err := rc.Read(buf)
-	if err == io.EOF {
+	readBytes, err := rc.Read(buf)
+	if err == io.EOF || readBytes < n {
 		rc.Close()
-		return string(buf[:n]), io.NopCloser(bytes.NewReader(buf[:n])), nil
+		return string(buf[:readBytes]), io.NopCloser(bytes.NewReader(buf[:readBytes])), nil
 	} else if err != nil {
 		return "", rc, err
 	}
