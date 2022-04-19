@@ -2,7 +2,6 @@ package lumigotracer
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -45,8 +44,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
 	span.SetStatus(semconv.SpanStatusFromHTTPStatusCode(resp.StatusCode))
 	resp, span = addResponseDataToSpanAndWrap(resp, span)
-
-	resp.Body = &wrappedBody{ctx: traceCtx, span: span, body: resp.Body}
+	span.End()
 	return resp, err
 }
 
@@ -67,11 +65,13 @@ func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io
 		bodyStr, bodyReadCloser, bodyErr := getFirstNCharsFromReadCloser(body, cfg.MaxEntrySize)
 		if bodyErr != nil {
 			logger.WithError(bodyErr).Error("failed to parse response body")
+			span.RecordError(bodyErr)
+			span.SetStatus(codes.Error, bodyErr.Error())
 			span.SetAttributes(attribute.String(attributeKey, ""))
 		} else {
 			span.SetAttributes(attribute.String(attributeKey, bodyStr))
+			body = bodyReadCloser
 		}
-		body = bodyReadCloser
 	}
 	return body, span
 }
@@ -99,37 +99,12 @@ func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadClose
 	buf := make([]byte, n)
 	n, err := rc.Read(buf)
 	if err == io.EOF {
+		rc.Close()
 		return string(buf[:n]), io.NopCloser(bytes.NewReader(buf[:n])), nil
 	} else if err != nil {
 		return "", rc, err
 	}
 	return string(buf), newMultiReadCloser(bytes.NewReader(buf), rc), nil
-}
-
-type wrappedBody struct {
-	ctx  context.Context
-	span trace.Span
-	body io.ReadCloser
-}
-
-func (wb *wrappedBody) Read(b []byte) (int, error) {
-	n, err := wb.body.Read(b)
-
-	switch err {
-	case nil:
-		// nothing to do here but fall through to the return
-	case io.EOF:
-		wb.span.End()
-	default:
-		wb.span.RecordError(err)
-		wb.span.SetStatus(codes.Error, err.Error())
-	}
-	return n, err
-}
-
-func (wb *wrappedBody) Close() error {
-	wb.span.End()
-	return wb.body.Close()
 }
 
 func newMultiReadCloser(tail io.Reader, rc io.ReadCloser) io.ReadCloser {
