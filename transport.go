@@ -100,8 +100,8 @@ func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadClose
 	buf := make([]byte, n)
 	readBytes, err := rc.Read(buf)
 	if err == io.EOF || readBytes < n {
-		rc.Close()
-		return string(buf[:readBytes]), io.NopCloser(bytes.NewReader(buf[:readBytes])), nil
+		wrapedReadCloser := readCloserContainer{reader: bytes.NewReader(buf[:readBytes]), closer: rc}
+		return string(buf[:readBytes]), &wrapedReadCloser, nil
 	} else if err != nil {
 		return "", rc, err
 	}
@@ -109,21 +109,21 @@ func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadClose
 }
 
 func newMultiReadCloser(tail io.Reader, rc io.ReadCloser) io.ReadCloser {
-	return &multiReadCloser{
+	return &readCloserContainer{
 		reader: io.MultiReader(tail, rc),
 		closer: rc,
 	}
 }
 
-type multiReadCloser struct {
+type readCloserContainer struct {
 	reader io.Reader
 	closer io.Closer
 }
 
-func (mrc *multiReadCloser) Read(b []byte) (int, error) {
+func (mrc *readCloserContainer) Read(b []byte) (int, error) {
 	return mrc.reader.Read(b)
 }
 
-func (mrc *multiReadCloser) Close() error {
+func (mrc *readCloserContainer) Close() error {
 	return mrc.closer.Close()
 }
