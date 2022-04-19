@@ -3,9 +3,9 @@
 [![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=BOtQ9Myp1t)](https://codecov.io/gh/lumigo-io/lumigo-go-tracer)
 [![GoDoc](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer?status.svg)](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer)
 
-# go-tracer (BETA)
+# lumigo-go-tracer
 
-This is lumigo/lumigo-go-tracer, Lumigo's Golang agent for distributed tracing and performance monitoring.
+This is lumigo/lumigo-go-tracer, Lumigo's Golang tracer for distributed tracing and monitoring.
 
 ## Installation
 
@@ -27,14 +27,28 @@ $ go get github.com/lumigo-io/lumigo-go-tracer@master
 Lumigo Go tracer offers several different configuration options. Pass these to the Lambda function as environment variables:
 
 
-| Name                         | Type      | Description                 | Required          |
-|------------------------------|-----------|-----------------------------|-------------------|
-| LUMIGO_USE_TRACER_EXTENSION  | bool      | Enables usage of Go tracer  | true              |
-| LUMIGO_DEBUG                 | bool      | Enables debug logging       | false             |
+| Name                         | Type   | Description                | Required          |
+|------------------------------|--------|----------------------------|-------------------|
+| LUMIGO_USE_TRACER_EXTENSION  | bool   | Enables usage of Go tracer | true              |
+| LUMIGO_DEBUG                 | bool   | Enables debug logging      | false             |
+| LUMIGO_TRACER_TOKEN          | string | Your Lumigo token          | false             |
 
 ## Usage
+### Setup - Configure Your Environment
 
-You need a lumigo token which you can find under the `Project Settings` and `Tracing` tab in lumigo platform. Then you need just to wrap your Lambda:
+Add AWS Lambda Layer:
+```
+arn:aws:lambda:<your-region>:114300393969:layer:lumigo-tracer-extension:38
+```
+
+Add Environment variable:
+```
+LUMIGO_USE_TRACER_EXTENSION=true
+```
+
+### Setup - Code
+
+You need a lumigo token which you can find under the `Project Settings` and `Tracing` tab in lumigo platform. Then you need to wrap your Lambda:
 
 ```go
 import (
@@ -58,6 +72,15 @@ func main() {
 	lambda.Start(wrappedHandler)
 }
 ```
+
+Another option is to pass the token via the environment variable: `LUMIGO_TRACER_TOKEN`.
+Then the wrapping will look like this:
+
+```go
+wrappedHandler := lumigotracer.WrapHandler(HandleRequest, &lumigotracer.Config{})
+```
+
+### HTTP Tracking
 
 For tracing AWS SDK v2.0 calls check the following example:
 
@@ -94,7 +117,6 @@ For tracing HTTP calls check the following example:
 	res, err := ctxhttp.Do(context.Background(), client, req)
 ```
 
-In your lambda environment variables you need to set `LUMIGO_USE_TRACER_EXTENSION: true` and use the following layer for `us-east-1`: `arn:aws:lambda:us-east-1:114300393969:layer:lumigo-tracer-extension:36`. The layer will be available in more regions soon.
 
 ## Contributing
 Contributions to this project are welcome from all! Below are a couple pointers on how to prepare your machine, as well as some information on testing.
