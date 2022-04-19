@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=BOtQ9Myp1t)](https://codecov.io/gh/lumigo-io/lumigo-go-tracer)
 [![GoDoc](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer?status.svg)](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer)
 
-# go-tracer (BETA)
+# lumigo-go-tracer
 
 This is lumigo/lumigo-go-tracer, Lumigo's Golang agent for distributed tracing and performance monitoring.
 
