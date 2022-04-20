@@ -45,7 +45,7 @@ type LogFormatter struct{}
 func (s *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf("#LUMIGO# - %s - %s - %s ", timestamp, strings.ToUpper(entry.Level.String()), entry.Message)
-	if entry.Data != nil {
+	if entry.Data != nil && len(entry.Data) > 0 {
 		data := make(log.Fields)
 		for k, v := range entry.Data {
 			if k == "error" {
