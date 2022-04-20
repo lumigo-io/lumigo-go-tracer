@@ -61,7 +61,8 @@ func (s *mySpan) TracerProvider() trace.TracerProvider {
 }
 
 func TestTransport(t *testing.T) {
-	loadConfig(Config{})
+	err := loadConfig(Config{Token: "test"})
+	assert.NoError(t, err)
 
 	content := []byte("Hello, world!")
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
