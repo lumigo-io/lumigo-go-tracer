@@ -160,6 +160,7 @@ type readCloser struct {
 func (rc readCloser) Read(p []byte) (n int, err error) {
 	return readSize, rc.readErr
 }
+
 func (rc readCloser) Close() error {
 	return rc.closeErr
 }

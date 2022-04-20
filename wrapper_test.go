@@ -329,3 +329,33 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 		assert.NoError(w.T(), deleteAllFiles())
 	}
 }
+
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler() {
+	// verify that the spans dir is empty
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 0, len(dirEntries))
+
+	recoverAndCheckFailWriteSpan()
+	dirEntries, err = os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 1, len(dirEntries))
+	assert.NoError(w.T(), deleteAllFiles())
+
+	handlerToWrap := func(s string) string {
+		return fmt.Sprintf("Hello %s!", s)
+	}
+	inputPayload, _ := json.Marshal("test")
+	lambdaHandler := WrapHandler(handlerToWrap, &Config{Token: "token", debug: true})
+
+	handler := reflect.ValueOf(lambdaHandler)
+	_ = handler.Call([]reflect.Value{reflect.ValueOf(context.Background()), reflect.ValueOf(inputPayload)})
+
+	dirEntries, err = os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 2, len(dirEntries))
+	for _, dirEntry := range dirEntries {
+		assert.NotEqual(w.T(), "balagan_end", dirEntry.Name())
+	}
+	assert.NoError(w.T(), deleteAllFiles())
+}
