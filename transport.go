@@ -30,6 +30,7 @@ func NewTransport(transport http.RoundTripper) *Transport {
 
 func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	traceCtx, span := t.provider.Tracer("lumigo").Start(req.Context(), "HttpSpan")
+	defer span.End()
 
 	req = req.WithContext(traceCtx)
 	span.SetAttributes(semconv.HTTPClientAttributesFromHTTPRequest(req)...)
@@ -43,21 +44,20 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	}
 	span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
 	span.SetStatus(semconv.SpanStatusFromHTTPStatusCode(resp.StatusCode))
-	resp, span = addResponseDataToSpanAndWrap(resp, span)
-	span.End()
+	resp = addResponseDataToSpanAndWrap(resp, span)
 	return resp, err
 }
 
 func addRequestDataToSpanAndWrap(req *http.Request, span trace.Span) (*http.Request, trace.Span) {
 	req.Body, span = addBodyToSpan(req.Body, span, "http.request_body")
-	span = addHeaderToSpan(req.Header, span, "http.request_headers")
+	addHeaderToSpan(req.Header, span, "http.request_headers")
 	return req, span
 }
 
-func addResponseDataToSpanAndWrap(resp *http.Response, span trace.Span) (*http.Response, trace.Span) {
+func addResponseDataToSpanAndWrap(resp *http.Response, span trace.Span) *http.Response {
 	resp.Body, span = addBodyToSpan(resp.Body, span, "http.response_body")
-	span = addHeaderToSpan(resp.Header, span, "http.response_headers")
-	return resp, span
+	addHeaderToSpan(resp.Header, span, "http.response_headers")
+	return resp
 }
 
 func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io.ReadCloser, trace.Span) {
@@ -65,7 +65,6 @@ func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io
 		logger.Info("adding body to span")
 		bodyStr, bodyReadCloser, bodyErr := getFirstNCharsFromReadCloser(body, cfg.MaxEntrySize)
 		if bodyErr != nil {
-			logger.WithError(bodyErr).Error("failed to parse response body")
 			span.RecordError(bodyErr)
 			span.SetStatus(codes.Error, bodyErr.Error())
 			span.SetAttributes(attribute.String(attributeKey, ""))
@@ -77,7 +76,7 @@ func addBodyToSpan(body io.ReadCloser, span trace.Span, attributeKey string) (io
 	return body, span
 }
 
-func addHeaderToSpan(srcHeaders http.Header, span trace.Span, attributeKey string) trace.Span {
+func addHeaderToSpan(srcHeaders http.Header, span trace.Span, attributeKey string) {
 	headers := make(map[string]string)
 	for k, values := range srcHeaders {
 		for _, value := range values {
@@ -87,23 +86,26 @@ func addHeaderToSpan(srcHeaders http.Header, span trace.Span, attributeKey strin
 	headersJson, jsonErr := json.Marshal(headers)
 	if jsonErr != nil {
 		logger.WithError(jsonErr).Error("failed to fetch request headers")
+		span.RecordError(jsonErr)
+		span.SetStatus(codes.Error, jsonErr.Error())
 	}
 	if len(headersJson) > cfg.MaxEntrySize {
 		span.SetAttributes(attribute.String(attributeKey, string(headersJson[:cfg.MaxEntrySize])))
 	} else {
 		span.SetAttributes(attribute.String(attributeKey, string(headersJson)))
 	}
-	return span
 }
 
 func getFirstNCharsFromReadCloser(rc io.ReadCloser, n int) (string, io.ReadCloser, error) {
 	buf := make([]byte, n)
 	readBytes, err := rc.Read(buf)
+	if err != nil && err != io.EOF {
+		logger.WithError(err).Errorf("failed to read from readCloser %+v", rc)
+		return "", rc, err
+	}
 	if err == io.EOF || readBytes < n {
 		wrapedReadCloser := readCloserContainer{reader: bytes.NewReader(buf[:readBytes]), closer: rc}
 		return string(buf[:readBytes]), &wrapedReadCloser, nil
-	} else if err != nil {
-		return "", rc, err
 	}
 	return string(buf), newMultiReadCloser(bytes.NewReader(buf), rc), nil
 }
