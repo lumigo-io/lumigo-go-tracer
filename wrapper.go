@@ -135,7 +135,6 @@ func createExporter(printStdout bool, ctx context.Context, logger log.FieldLogge
 
 func recoverAndCheckFailWriteSpan() {
 	defer recoverWithLogs()
-	// mustn't panic here
 	dirEntries, err := os.ReadDir(SPANS_DIR)
 	if err != nil {
 		logger.WithError(err).Error("failed to read spans dir")
