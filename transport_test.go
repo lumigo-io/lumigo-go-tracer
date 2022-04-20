@@ -3,139 +3,191 @@ package lumigotracer
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func TestTransport(t *testing.T) {
-	content := []byte("Hello, world!")
+type provider struct {
+	s trace.Span
+}
 
-	ctx := context.Background()
+func (p *provider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
+	return &myTracer{s: p.s}
+}
+
+type myTracer struct {
+	s trace.Span
+}
+
+func (t *myTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	return context.Background(), t.s
+}
+
+type mySpan struct {
+	attrs     string
+	endCalled bool
+	p         trace.TracerProvider
+}
+
+func (s *mySpan) End(options ...trace.SpanEndOption) {
+	s.endCalled = true
+}
+
+func (s *mySpan) AddEvent(name string, options ...trace.EventOption)  {}
+func (s *mySpan) IsRecording() bool                                   { return true }
+func (s *mySpan) RecordError(err error, options ...trace.EventOption) {}
+func (s *mySpan) SpanContext() trace.SpanContext {
+	return trace.SpanContext{}
+}
+func (s *mySpan) SetStatus(code codes.Code, description string) {}
+func (s *mySpan) SetName(name string)                           {}
+func (s *mySpan) SetAttributes(kv ...attribute.KeyValue) {
+	for _, kvInner := range kv {
+		s.attrs += fmt.Sprintf("%s:%s;", kvInner.Key, kvInner.Value.AsString()) + "\n"
+	}
+}
+func (s *mySpan) TracerProvider() trace.TracerProvider {
+	return s.p
+}
+
+type readCloser struct {
+	readErr, closeErr error
+	readSize          int
+}
+
+func (rc readCloser) Read(p []byte) (n int, err error) {
+	return rc.readSize, rc.readErr
+}
+
+func (rc readCloser) Close() error {
+	return rc.closeErr
+}
+func cleanDates(str string) string {
+	m1 := regexp.MustCompile(`"Date":"\w\w\w, ((\d\d)|(\d)) \w\w\w \d\d\d\d \d\d:\d\d:\d\d \w\w\w"`)
+	return m1.ReplaceAllString(str, `"Date":"Fri, 07 Dec 1979 19:00:18 GMT"`)
+}
+
+func TestTransport(t *testing.T) {
+	err := loadConfig(Config{Token: "test"})
+	assert.NoError(t, err)
+
+	content := []byte("Hello, world!")
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write(content); err != nil {
 			t.Fatal(err)
 		}
 	}))
+
 	defer ts.Close()
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	testcases := []struct {
-		testname  string
-		transport http.RoundTripper
+		testname string
+		readFunc func(body io.ReadCloser) ([]byte, error)
+		expected []byte
 	}{
 		{
-			testname:  "http default transport",
-			transport: http.DefaultTransport,
+			testname: "read all",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return io.ReadAll(body) },
+			expected: []byte("Hello, world!"),
 		},
 		{
-			testname:  "http default transport",
-			transport: nil,
+			testname: "partial read",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return io.ReadAll(io.LimitReader(body, 5)) },
+			expected: []byte("Hello"),
+		},
+		{
+			testname: "no read",
+			readFunc: func(body io.ReadCloser) ([]byte, error) { return []byte{}, nil },
+			expected: []byte{},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.testname, func(t *testing.T) {
-			tr := NewTransport(http.DefaultTransport)
-
-			c := http.Client{Transport: tr}
-			res, err := c.Do(r)
+			spanMock := &mySpan{}
+			lTrans := NewTransport(http.DefaultTransport)
+			lTrans.provider = &provider{s: spanMock}
+			c := http.Client{Transport: lTrans}
+			res, err := c.Post(ts.URL, "application/json", bytes.NewReader([]byte("post body")))
 			if err != nil {
-				t.Fatal(err)
+				assert.FailNow(t, err.Error())
 			}
+			body, err := tc.readFunc(res.Body)
+			assert.NoError(t, err)
+			res.Body.Close()
+			assert.Equal(t, tc.expected, body)
+			assert.Equal(t, true, spanMock.endCalled)
+			assert.Equal(t, fmt.Sprintf(`http.method:POST;
+http.url:%s;
+http.request_content_length:;
+http.scheme:http;
+http.host:%s;
+http.flavor:1.1;
+http.target:;
+http.host:%s;
+http.request_body:post body;
+http.request_headers:{"Content-Type":"application/json"};
+http.status_code:;
+http.response_body:Hello, world!;
+http.response_headers:{"Content-Length":"13","Content-Type":"text/plain; charset=utf-8","Date":"Fri, 07 Dec 1979 19:00:18 GMT"};
+`, ts.URL, ts.URL[7:], ts.URL[7:]), cleanDates(spanMock.attrs))
 
-			body, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !bytes.Equal(body, content) {
-				t.Fatalf("unexpected content: got %s, expected %s", body, content)
-			}
 		})
 	}
 }
 
-const readSize = 42
-
-type readCloser struct {
-	readErr, closeErr error
-}
-
-func (rc readCloser) Read(p []byte) (n int, err error) {
-	return readSize, rc.readErr
-}
-func (rc readCloser) Close() error {
-	return rc.closeErr
-}
-
-type span struct {
-	trace.Span
-
-	ended       bool
-	recordedErr error
-
-	statusCode codes.Code
-	statusDesc string
-}
-
-func (s *span) End(...trace.SpanEndOption) {
-	s.ended = true
-}
-
-func (s *span) RecordError(err error, _ ...trace.EventOption) {
-	s.recordedErr = err
-}
-
-func (s *span) SetStatus(c codes.Code, d string) {
-	s.statusCode, s.statusDesc = c, d
-}
-
-func TestWrappedBodyRead(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
+func TestGetFirstNCharsFromReader(t *testing.T) {
+	rc := io.NopCloser(bytes.NewReader([]byte("Hello, world!")))
+	first5Char, origReader, err := getFirstNCharsFromReadCloser(rc, 5)
 	assert.NoError(t, err)
+	assert.Equal(t, "Hello", first5Char)
+	allChars, err := io.ReadAll(origReader)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("Hello, world!"), allChars)
 }
 
-func TestWrappedBodyReadEOFError(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{readErr: io.EOF}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
-	assert.Equal(t, io.EOF, err)
+func TestGetFirstNCharsFromReaderWithErr(t *testing.T) {
+	rc := &readCloser{readErr: errors.New("test")}
+	first5Char, _, err := getFirstNCharsFromReadCloser(rc, 5)
+	assert.Error(t, err)
+	assert.Equal(t, "", first5Char)
 }
 
-func TestWrappedBodyReadError(t *testing.T) {
-	s := new(span)
-	expectedErr := errors.New("test")
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{readErr: expectedErr}}
-	n, err := wb.Read([]byte{})
-	assert.Equal(t, readSize, n, "wrappedBody returned wrong bytes")
-	assert.Equal(t, expectedErr, err)
-}
-
-func TestWrappedBodyClose(t *testing.T) {
-	s := new(span)
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{}}
-	assert.NoError(t, wb.Close())
-}
-
-func TestWrappedBodyCloseError(t *testing.T) {
-	s := new(span)
-	expectedErr := errors.New("test")
-	wb := &wrappedBody{span: trace.Span(s), body: readCloser{closeErr: expectedErr}}
-	assert.Equal(t, expectedErr, wb.Close())
+func TestTransportBodyReadError(t *testing.T) {
+	err := loadConfig(Config{Token: "test"})
+	assert.NoError(t, err)
+	spanMock := &mySpan{}
+	lTrans := NewTransport(http.DefaultTransport)
+	lTrans.provider = &provider{s: spanMock}
+	c := http.Client{Transport: lTrans}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := w.Write([]byte("Hello, world!")); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	r, _ := http.NewRequest("POST", ts.URL, bytes.NewReader([]byte("post body")))
+	r.Header.Set("Content-Type", "application/json")
+	_, err = c.Post(ts.URL, "application/json", readCloser{readErr: errors.New("test")})
+	assert.Error(t, err)
+	assert.Equal(t, true, spanMock.endCalled)
+	assert.Equal(t, fmt.Sprintf(`http.method:POST;
+http.url:%s;
+http.scheme:http;
+http.host:%s;
+http.flavor:1.1;
+http.target:;
+http.host:%s;
+http.request_body:;
+http.request_headers:{"Content-Type":"application/json"};
+`, ts.URL, ts.URL[7:], ts.URL[7:]), cleanDates(spanMock.attrs))
 }

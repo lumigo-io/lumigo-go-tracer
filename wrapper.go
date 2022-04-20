@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	lumigoctx "github.com/lumigo-io/lumigo-go-tracer/internal/context"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
@@ -34,7 +35,7 @@ const (
 func init() {
 	logger = log.New()
 	logger.Out = os.Stdout
-	logger.Formatter = &LogFormatter{}
+	logger.SetFormatter(&LogFormatter{})
 }
 
 //Log custom format
@@ -45,7 +46,15 @@ func (s *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf("#LUMIGO# - %s - %s - %s ", timestamp, strings.ToUpper(entry.Level.String()), entry.Message)
 	if entry.Data != nil {
-		jsonBytes, err := json.Marshal(entry.Data)
+		data := make(logrus.Fields)
+		for k, v := range entry.Data {
+			if k == "error" {
+				data[k] = fmt.Sprintf("%+v", v)
+			} else {
+				data[k] = v
+			}
+		}
+		jsonBytes, err := json.Marshal(data)
 		if err != nil {
 			msg += fmt.Sprintf("failed to extract data from logger err: %+v", err)
 
