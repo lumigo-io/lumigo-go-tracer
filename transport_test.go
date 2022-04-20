@@ -60,6 +60,23 @@ func (s *mySpan) TracerProvider() trace.TracerProvider {
 	return s.p
 }
 
+type readCloser struct {
+	readErr, closeErr error
+	readSize          int
+}
+
+func (rc readCloser) Read(p []byte) (n int, err error) {
+	return rc.readSize, rc.readErr
+}
+
+func (rc readCloser) Close() error {
+	return rc.closeErr
+}
+func cleanDates(str string) string {
+	m1 := regexp.MustCompile(`"Date":"\w\w\w, ((\d\d)|(\d)) \w\w\w \d\d\d\d \d\d:\d\d:\d\d \w\w\w"`)
+	return m1.ReplaceAllString(str, `"Date":"Fri, 07 Dec 1979 19:00:18 GMT"`)
+}
+
 func TestTransport(t *testing.T) {
 	err := loadConfig(Config{Token: "test"})
 	assert.NoError(t, err)
@@ -129,11 +146,6 @@ http.response_headers:{"Content-Length":"13","Content-Type":"text/plain; charset
 	}
 }
 
-func cleanDates(str string) string {
-	m1 := regexp.MustCompile(`"Date":"\w\w\w, ((\d\d)|(\d)) \w\w\w \d\d\d\d \d\d:\d\d:\d\d \w\w\w"`)
-	return m1.ReplaceAllString(str, `"Date":"Fri, 07 Dec 1979 19:00:18 GMT"`)
-}
-
 func TestGetFirstNCharsFromReader(t *testing.T) {
 	rc := io.NopCloser(bytes.NewReader([]byte("Hello, world!")))
 	first5Char, origReader, err := getFirstNCharsFromReadCloser(rc, 5)
@@ -151,16 +163,31 @@ func TestGetFirstNCharsFromReaderWithErr(t *testing.T) {
 	assert.Equal(t, "", first5Char)
 }
 
-const readSize = 42
-
-type readCloser struct {
-	readErr, closeErr error
-}
-
-func (rc readCloser) Read(p []byte) (n int, err error) {
-	return readSize, rc.readErr
-}
-
-func (rc readCloser) Close() error {
-	return rc.closeErr
+func TestTransportBodyReadError(t *testing.T) {
+	err := loadConfig(Config{Token: "test"})
+	assert.NoError(t, err)
+	spanMock := &mySpan{}
+	lTrans := NewTransport(http.DefaultTransport)
+	lTrans.provider = &provider{s: spanMock}
+	c := http.Client{Transport: lTrans}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := w.Write([]byte("Hello, world!")); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	r, _ := http.NewRequest("POST", ts.URL, bytes.NewReader([]byte("post body")))
+	r.Header.Set("Content-Type", "application/json")
+	_, err = c.Post(ts.URL, "application/json", readCloser{readErr: errors.New("test")})
+	assert.Error(t, err)
+	assert.Equal(t, true, spanMock.endCalled)
+	assert.Equal(t, fmt.Sprintf(`http.method:POST;
+http.url:%s;
+http.scheme:http;
+http.host:%s;
+http.flavor:1.1;
+http.target:;
+http.host:%s;
+http.request_body:;
+http.request_headers:{"Content-Type":"application/json"};
+`, ts.URL, ts.URL[7:], ts.URL[7:]), cleanDates(spanMock.attrs))
 }
