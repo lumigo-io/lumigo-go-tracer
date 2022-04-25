@@ -342,6 +342,8 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler() {
 	assert.Equal(w.T(), 1, len(dirEntries))
 	assert.NoError(w.T(), deleteAllFiles())
 
+}
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_HandlerSuccess() {
 	handlerToWrap := func(s string) string {
 		return fmt.Sprintf("Hello %s!", s)
 	}
@@ -351,11 +353,36 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler() {
 	handler := reflect.ValueOf(lambdaHandler)
 	_ = handler.Call([]reflect.Value{reflect.ValueOf(context.Background()), reflect.ValueOf(inputPayload)})
 
-	dirEntries, err = os.ReadDir(SPANS_DIR)
+	dirEntries, err := os.ReadDir(SPANS_DIR)
 	assert.NoError(w.T(), err)
 	assert.Equal(w.T(), 2, len(dirEntries))
+	var startSpanDir, endSpanDir string
 	for _, dirEntry := range dirEntries {
-		assert.NotEqual(w.T(), "balagan_end", dirEntry.Name())
+		if strings.Contains(dirEntry.Name(), "span") {
+			startSpanDir = dirEntry.Name()
+		} else if strings.Contains(dirEntry.Name(), "end") {
+			endSpanDir = dirEntry.Name()
+		}
+		assert.NotEqual(w.T(), "balagan_stop", dirEntry.Name())
 	}
+	assert.NotEmpty(w.T(), startSpanDir)
+	assert.NotEmpty(w.T(), endSpanDir)
+	assert.NoError(w.T(), deleteAllFiles())
+}
+
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_FailLoadConfig() {
+	handlerToWrap := func(s string) string {
+		return fmt.Sprintf("Hello %s!", s)
+	}
+	lambdaHandler := WrapHandler(handlerToWrap, &Config{Token: "", debug: true})
+
+	handler := reflect.ValueOf(lambdaHandler)
+	_ = handler.Call([]reflect.Value{reflect.ValueOf("test")})
+
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 1, len(dirEntries))
+
+	assert.Equal(w.T(), "balagan_stop", dirEntries[0].Name())
 	assert.NoError(w.T(), deleteAllFiles())
 }

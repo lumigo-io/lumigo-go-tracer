@@ -69,7 +69,7 @@ func (s *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 // WrapHandler wraps the lambda handler
 func WrapHandler(handler interface{}, conf *Config) interface{} {
 	if err := loadConfig(*conf); err != nil {
-		defer recoverAndCheckFailWriteSpan()
+		recoverAndCheckFailWriteSpan()
 		logger.WithError(err).Error("failed validation error")
 		return handler
 	}
@@ -149,9 +149,9 @@ func recoverAndCheckFailWriteSpan() {
 		}
 	}
 	if !found {
-		endFile, err := os.Create(filepath.Join(SPANS_DIR, "balagan_end"))
+		endFile, err := os.Create(filepath.Join(SPANS_DIR, "balagan_stop"))
 		if err != nil {
-			logger.WithError(err).Error("failed to create file _end in spans dir lambda will timeout :/")
+			logger.WithError(err).Error("failed to create file _end")
 		}
 		endFile.Close()
 	}
