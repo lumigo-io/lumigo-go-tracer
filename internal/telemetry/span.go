@@ -103,7 +103,7 @@ type Span struct {
 	// LambdaReadiness is if lambda is cold or warmed already
 	LambdaReadiness string `json:"readiness"`
 
-	// LambdaResponse the response of Lambda
+	// LambdaResponse the response of Lambda only in end span
 	LambdaResponse *string `json:"return_value"`
 
 	// LambdaContainerID the id of the lambda container

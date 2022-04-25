@@ -135,13 +135,13 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	} else {
 		m.logger.Error("unable to fetch lumigo token from span")
 	}
-
-	if returnValue, ok := attrs["response"]; ok {
-		lumigoSpan.LambdaResponse = aws.String(fmt.Sprint(returnValue))
-	} else if !isStartSpan {
-		m.logger.Error("unable to fetch lambda response from span")
+	if m.span.Name() == "LumigoParentSpan" {
+		if returnValue, ok := attrs["response"]; ok {
+			lumigoSpan.LambdaResponse = aws.String(fmt.Sprint(returnValue))
+		} else if !isStartSpan {
+			m.logger.Error("unable to fetch lambda response from span")
+		}
 	}
-
 	if transactionID := getTransactionID(awsRoot); transactionID != "" {
 		lumigoSpan.TransactionID = transactionID
 	} else {
@@ -241,8 +241,6 @@ func (m *mapper) getHTTPInfo(attrs map[string]interface{}) *telemetry.SpanHttpIn
 
 	if reqBody, ok := attrs["http.request_body"]; ok {
 		spanHttpInfo.Request.Body = fmt.Sprint(reqBody)
-	} else {
-		m.logger.Error("unable to fetch HTTP request body")
 	}
 
 	if headers, ok := attrs["http.response_headers"]; ok {
