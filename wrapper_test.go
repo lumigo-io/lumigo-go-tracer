@@ -65,6 +65,7 @@ func (w *wrapperTestSuite) TearDownTest() {
 	_ = os.Unsetenv("AWS_LAMBDA_LOG_GROUP_NAME")
 	_ = os.Unsetenv("AWS_LAMBDA_FUNCTION_VERSION")
 	_ = os.Unsetenv("_X_AMZN_TRACE_ID")
+	assert.NoError(w.T(), deleteAllFiles())
 }
 
 func (w *wrapperTestSuite) TestLambdaHandlerSignatures() {
@@ -389,5 +390,5 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_FailLoadConfig() {
 	assert.Equal(w.T(), 1, len(dirEntries))
 
 	assert.Equal(w.T(), "balagan_stop", dirEntries[0].Name())
-	assert.NoError(w.T(), deleteAllFiles())
+
 }
