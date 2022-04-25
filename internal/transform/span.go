@@ -90,6 +90,14 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	if m.span.Name() != lumigoSpan.LambdaName && m.span.Name() != "LumigoParentSpan" {
 		lambdaType = "http"
 		lumigoSpan.SpanInfo.HttpInfo = m.getHTTPInfo(attrs)
+	} else {
+		lumigoSpan.LambdaEnvVars = m.getEnvVars()
+
+		if event, ok := attrs["event"]; ok {
+			lumigoSpan.Event = fmt.Sprint(event)
+		} else {
+			m.logger.Error("unable to fetch lambda event from span")
+		}
 	}
 	lumigoSpan.LambdaType = lambdaType
 
@@ -128,12 +136,6 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		m.logger.Error("unable to fetch lumigo token from span")
 	}
 
-	if event, ok := attrs["event"]; ok {
-		lumigoSpan.Event = fmt.Sprint(event)
-	} else {
-		m.logger.Error("unable to fetch lambda event from span")
-	}
-
 	if returnValue, ok := attrs["response"]; ok {
 		lumigoSpan.LambdaResponse = aws.String(fmt.Sprint(returnValue))
 	} else if !isStartSpan {
@@ -165,7 +167,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	if !isStartSpan {
 		lumigoSpan.SpanError = m.getSpanError(attrs)
 	}
-	lumigoSpan.LambdaEnvVars = m.getEnvVars()
+
 	return lumigoSpan
 }
 
