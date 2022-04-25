@@ -77,7 +77,11 @@ func (t *tracer) Start() {
 func (t *tracer) End(response []byte, lambdaErr error) {
 	defer recoverWithLogs()
 	if data, err := json.Marshal(json.RawMessage(response)); err == nil && lambdaErr == nil {
-		t.span.SetAttributes(attribute.String("response", string(data)))
+		if len(data) > cfg.MaxEntrySize {
+			t.span.SetAttributes(attribute.String("response", string(data)[:cfg.MaxEntrySize]))
+		} else {
+			t.span.SetAttributes(attribute.String("response", string(data)))
+		}
 	} else {
 		t.logger.WithError(err).Error("failed to track response")
 	}
