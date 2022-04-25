@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -356,17 +357,21 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_HandlerSuccess() {
 	dirEntries, err := os.ReadDir(SPANS_DIR)
 	assert.NoError(w.T(), err)
 	assert.Equal(w.T(), 2, len(dirEntries))
-	var startSpanDir, endSpanDir string
+	var startSpanFilename, endSpanFilename string
 	for _, dirEntry := range dirEntries {
 		if strings.Contains(dirEntry.Name(), "span") {
-			startSpanDir = dirEntry.Name()
+			startSpanFilename = dirEntry.Name()
 		} else if strings.Contains(dirEntry.Name(), "end") {
-			endSpanDir = dirEntry.Name()
+			endSpanFilename = dirEntry.Name()
 		}
 		assert.NotEqual(w.T(), "balagan_stop", dirEntry.Name())
 	}
-	assert.NotEmpty(w.T(), startSpanDir)
-	assert.NotEmpty(w.T(), endSpanDir)
+	assert.NotEmpty(w.T(), startSpanFilename)
+	assert.NotEmpty(w.T(), endSpanFilename)
+
+	fileBytes, err := ioutil.ReadFile(path.Join(SPANS_DIR, startSpanFilename))
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 3764, len(fileBytes))
 	assert.NoError(w.T(), deleteAllFiles())
 }
 
