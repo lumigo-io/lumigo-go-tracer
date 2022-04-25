@@ -203,30 +203,30 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 		expected   expected
 		handler    interface{}
 	}{
-		// {
-		// 	name:     "input: string, with context",
-		// 	input:    "test",
-		// 	expected: expected{`"Hello test!"`, nil},
-		// 	handler: func(ctx context.Context, name string) (string, error) {
-		// 		return hello(name), nil
-		// 	},
-		// },
-		// {
-		// 	name:     "input: struct event, response as struct",
-		// 	input:    9090,
-		// 	expected: expected{`{"Port":9090}`, nil},
-		// 	handler: func(event int) (struct{ Port int }, error) {
-		// 		return struct{ Port int }{event}, nil
-		// 	},
-		// },
-		// {
-		// 	name:     "input: struct event, return error",
-		// 	input:    9090,
-		// 	expected: expected{"", errors.New("failed error")},
-		// 	handler: func(event int) (*struct{ Port int }, error) {
-		// 		return nil, errors.New("failed error")
-		// 	},
-		// },
+		{
+			name:     "input: string, with context",
+			input:    "test",
+			expected: expected{`"Hello test!"`, nil},
+			handler: func(ctx context.Context, name string) (string, error) {
+				return hello(name), nil
+			},
+		},
+		{
+			name:     "input: struct event, response as struct",
+			input:    9090,
+			expected: expected{`{"Port":9090}`, nil},
+			handler: func(event int) (struct{ Port int }, error) {
+				return struct{ Port int }{event}, nil
+			},
+		},
+		{
+			name:     "input: struct event, return error",
+			input:    9090,
+			expected: expected{"", errors.New("failed error")},
+			handler: func(event int) (*struct{ Port int }, error) {
+				return nil, errors.New("failed error")
+			},
+		},
 		{
 			name:     "ctxhttp transport",
 			input:    "test",
