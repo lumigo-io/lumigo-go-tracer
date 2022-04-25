@@ -371,7 +371,7 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_HandlerSuccess() {
 
 	fileBytes, err := ioutil.ReadFile(path.Join(SPANS_DIR, startSpanFilename))
 	assert.NoError(w.T(), err)
-	assert.Equal(w.T(), 3764, len(fileBytes))
+	assert.NotEmpty(w.T(), fileBytes)
 	assert.NoError(w.T(), deleteAllFiles())
 }
 
