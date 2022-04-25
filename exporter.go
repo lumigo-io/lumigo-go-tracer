@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 
@@ -105,10 +106,11 @@ func (e *Exporter) Shutdown(ctx context.Context) error {
 func writeSpan(spans []telemetry.Span, isStart bool) error {
 	var file string
 	if isStart {
-		file = fmt.Sprintf("/tmp/lumigo-spans/%s_span", ksuid.New())
+		file = fmt.Sprintf("%s_span", ksuid.New())
 	} else {
-		file = fmt.Sprintf("/tmp/lumigo-spans/%s_end", ksuid.New())
+		file = fmt.Sprintf("%s_end", ksuid.New())
 	}
+	file = filepath.Join(SPANS_DIR, file)
 	writer, err := os.Create(file)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create span data store: %s", file)

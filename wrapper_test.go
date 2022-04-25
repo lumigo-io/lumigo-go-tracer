@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -64,6 +65,7 @@ func (w *wrapperTestSuite) TearDownTest() {
 	_ = os.Unsetenv("AWS_LAMBDA_LOG_GROUP_NAME")
 	_ = os.Unsetenv("AWS_LAMBDA_FUNCTION_VERSION")
 	_ = os.Unsetenv("_X_AMZN_TRACE_ID")
+	assert.NoError(w.T(), deleteAllFiles())
 }
 
 func (w *wrapperTestSuite) TestLambdaHandlerSignatures() {
@@ -328,4 +330,65 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 
 		assert.NoError(w.T(), deleteAllFiles())
 	}
+}
+
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler() {
+	// verify that the spans dir is empty
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 0, len(dirEntries))
+
+	recoverAndCheckFailWriteSpan()
+	dirEntries, err = os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 1, len(dirEntries))
+	assert.NoError(w.T(), deleteAllFiles())
+
+}
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_HandlerSuccess() {
+	handlerToWrap := func(s string) string {
+		return fmt.Sprintf("Hello %s!", s)
+	}
+	inputPayload, _ := json.Marshal("test")
+	lambdaHandler := WrapHandler(handlerToWrap, &Config{Token: "token", debug: true})
+
+	handler := reflect.ValueOf(lambdaHandler)
+	_ = handler.Call([]reflect.Value{reflect.ValueOf(context.Background()), reflect.ValueOf(inputPayload)})
+
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 2, len(dirEntries))
+	var startSpanFilename, endSpanFilename string
+	for _, dirEntry := range dirEntries {
+		if strings.Contains(dirEntry.Name(), "span") {
+			startSpanFilename = dirEntry.Name()
+		} else if strings.Contains(dirEntry.Name(), "end") {
+			endSpanFilename = dirEntry.Name()
+		}
+		assert.NotEqual(w.T(), "balagan_stop", dirEntry.Name())
+	}
+	assert.NotEmpty(w.T(), startSpanFilename)
+	assert.NotEmpty(w.T(), endSpanFilename)
+
+	fileBytes, err := ioutil.ReadFile(path.Join(SPANS_DIR, startSpanFilename))
+	assert.NoError(w.T(), err)
+	assert.NotEmpty(w.T(), fileBytes)
+	assert.NoError(w.T(), deleteAllFiles())
+}
+
+func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_FailLoadConfig() {
+	handlerToWrap := func(s string) string {
+		return fmt.Sprintf("Hello %s!", s)
+	}
+	lambdaHandler := WrapHandler(handlerToWrap, &Config{Token: "", debug: true})
+
+	handler := reflect.ValueOf(lambdaHandler)
+	_ = handler.Call([]reflect.Value{reflect.ValueOf("test")})
+
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	assert.NoError(w.T(), err)
+	assert.Equal(w.T(), 1, len(dirEntries))
+
+	assert.Equal(w.T(), "balagan_stop", dirEntries[0].Name())
+
 }

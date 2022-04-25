@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	lumigoctx "github.com/lumigo-io/lumigo-go-tracer/internal/context"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
@@ -45,8 +45,8 @@ type LogFormatter struct{}
 func (s *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf("#LUMIGO# - %s - %s - %s ", timestamp, strings.ToUpper(entry.Level.String()), entry.Message)
-	if entry.Data != nil {
-		data := make(logrus.Fields)
+	if entry.Data != nil && len(entry.Data) > 0 {
+		data := make(log.Fields)
 		for k, v := range entry.Data {
 			if k == "error" {
 				data[k] = fmt.Sprintf("%+v", v)
@@ -69,6 +69,7 @@ func (s *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 // WrapHandler wraps the lambda handler
 func WrapHandler(handler interface{}, conf *Config) interface{} {
 	if err := loadConfig(*conf); err != nil {
+		recoverAndCheckFailWriteSpan()
 		logger.WithError(err).Error("failed validation error")
 		return handler
 	}
@@ -76,6 +77,7 @@ func WrapHandler(handler interface{}, conf *Config) interface{} {
 		logger.Out = io.Discard
 	}
 	return func(ctx context.Context, payload json.RawMessage) (interface{}, error) {
+		defer recoverAndCheckFailWriteSpan()
 		ctx = lumigoctx.NewContext(ctx, &lumigoctx.LumigoContext{
 			TracerVersion: version,
 		})
@@ -129,4 +131,28 @@ func createExporter(printStdout bool, ctx context.Context, logger log.FieldLogge
 		logger.WithError(err).Error()
 	}
 	return newExporter(ctx, logger)
+}
+
+func recoverAndCheckFailWriteSpan() {
+	defer recoverWithLogs()
+	dirEntries, err := os.ReadDir(SPANS_DIR)
+	if err != nil {
+		logger.WithError(err).Error("failed to read spans dir")
+	}
+	found := false
+	for _, file := range dirEntries {
+		if !file.IsDir() {
+			if strings.Contains(file.Name(), "_end") {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		endFile, err := os.Create(filepath.Join(SPANS_DIR, "balagan_stop"))
+		if err != nil {
+			logger.WithError(err).Error("failed to create file _end")
+		}
+		endFile.Close()
+	}
 }

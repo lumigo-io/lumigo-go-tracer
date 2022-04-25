@@ -223,7 +223,8 @@ func deleteAllFiles() error {
 	}
 
 	for _, file := range files {
-		if err := os.Remove(fmt.Sprintf("%s/%s", SPANS_DIR, file.Name())); err != nil {
+		filepath := filepath.Join(SPANS_DIR, file.Name())
+		if err := os.Remove(filepath); err != nil {
 			return err
 		}
 	}
