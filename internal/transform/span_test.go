@@ -308,7 +308,6 @@ func TestTransform(t *testing.T) {
 				LambdaType:       "http",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   nil,
-				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
 				ParentID:         mockLambdaContext.AwsRequestID,
