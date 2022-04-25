@@ -61,10 +61,14 @@ func (t *tracer) Start() {
 	defer recoverWithLogs()
 
 	t.logger.Info("tracer starting")
-	os.Setenv("IS_WARM_START", "true") // nolint
+	os.Setenv("IS_WARM_START", "true") // nolint // TODO: next bugfix
 
 	traceCtx, span := t.provider.Tracer("lumigo").Start(t.ctx, "LumigoParentSpan")
-	span.SetAttributes(attribute.String("event", string(t.eventData)))
+	if len(t.eventData) > cfg.MaxEntrySize {
+		span.SetAttributes(attribute.String("event", string(t.eventData[:cfg.MaxEntrySize])))
+	} else {
+		span.SetAttributes(attribute.String("event", string(t.eventData)))
+	}
 	t.span = span
 	t.traceCtx = traceCtx
 }
