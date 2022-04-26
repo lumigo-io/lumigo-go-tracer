@@ -3,13 +3,13 @@ package transform
 import (
 	"context"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/google/go-cmp/cmp"
 	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
@@ -304,9 +304,7 @@ func TestTransform(t *testing.T) {
 				},
 			},
 			expect: telemetry.Span{
-				LambdaName:       "test",
 				LambdaType:       "http",
-				LambdaReadiness:  "warm",
 				LambdaResponse:   nil,
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
@@ -358,9 +356,11 @@ func TestTransform(t *testing.T) {
 		if lumigoSpan.LambdaType == "http" {
 			lumigoSpan.ID = mockLambdaContext.AwsRequestID
 		}
-		if !reflect.DeepEqual(lumigoSpan, tc.expect) {
-			t.Errorf("%s: %#v != %#v", tc.testname, lumigoSpan, tc.expect)
+		// assert.Equal(t, tc.expect, lumigoSpan)
+		if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {
+			t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
 		}
+
 		tc.after()
 	}
 }
