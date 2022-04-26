@@ -238,8 +238,6 @@ func (m *mapper) getHTTPInfo(attrs map[string]interface{}) *telemetry.SpanHttpIn
 
 	if reqBody, ok := attrs["http.request_body"]; ok {
 		spanHttpInfo.Request.Body = fmt.Sprint(reqBody)
-	} else {
-		m.logger.Error("unable to fetch HTTP request body")
 	}
 
 	if headers, ok := attrs["http.response_headers"]; ok {
