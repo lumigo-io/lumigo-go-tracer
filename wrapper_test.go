@@ -390,5 +390,4 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_FailLoadConfig() {
 	assert.Equal(w.T(), 1, len(dirEntries))
 
 	assert.Equal(w.T(), "balagan_stop", dirEntries[0].Name())
-
 }
