@@ -22,16 +22,18 @@ import (
 )
 
 type mapper struct {
-	ctx    context.Context
-	span   sdktrace.ReadOnlySpan
-	logger logrus.FieldLogger
+	ctx          context.Context
+	span         sdktrace.ReadOnlySpan
+	logger       logrus.FieldLogger
+	maxEntrySize int
 }
 
-func NewMapper(ctx context.Context, span sdktrace.ReadOnlySpan, logger logrus.FieldLogger) *mapper {
+func NewMapper(ctx context.Context, span sdktrace.ReadOnlySpan, logger logrus.FieldLogger, maxEntrySize int) *mapper {
 	return &mapper{
-		ctx:    ctx,
-		span:   span,
-		logger: logger,
+		ctx:          ctx,
+		span:         span,
+		logger:       logger,
+		maxEntrySize: maxEntrySize,
 	}
 }
 
@@ -92,13 +94,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		lumigoSpan.LambdaName = lambdaName
 		lumigoSpan.MemoryAllocated = os.Getenv("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
 		lumigoSpan.Runtime = os.Getenv("AWS_EXECUTION_ENV")
-		lumigoSpan.LambdaEnvVars = m.getEnvVars()
-
-		if event, ok := attrs["event"]; ok {
-			lumigoSpan.Event = fmt.Sprint(event)
-		} else {
-			m.logger.Error("unable to fetch lambda event from span")
-		}
+		lumigoSpan.Event = m.getAttrAndLimit(attrs, "event")
 
 		isWarmStart := os.Getenv("IS_WARM_START")
 		if isWarmStart == "" && !isProvisionConcurrencyInitialization() {
@@ -108,7 +104,9 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		}
 	}
 	lumigoSpan.LambdaType = lambdaType
-
+	if isStartSpan {
+		lumigoSpan.LambdaEnvVars = m.getEnvVars()
+	}
 	lambdaCtx, lambdaOk := lambdacontext.FromContext(m.ctx)
 	if lambdaOk {
 		containerID, _ := uuid.NewUUID()
@@ -145,10 +143,9 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	}
 	if isEndSpan {
 		lumigoSpan.SpanError = m.getSpanError(attrs)
-		if returnValue, ok := attrs["response"]; ok {
-			lumigoSpan.LambdaResponse = aws.String(fmt.Sprint(returnValue))
-		} else {
-			m.logger.Error("unable to fetch lambda response from span")
+		lambdaResp := m.getAttrAndLimit(attrs, "response")
+		if lambdaResp != "" {
+			lumigoSpan.LambdaResponse = aws.String(lambdaResp)
 		}
 	}
 	if transactionID := getTransactionID(awsRoot); transactionID != "" {
@@ -202,11 +199,14 @@ func (m *mapper) getEnvVars() string {
 		pair := strings.SplitN(e, "=", 2)
 		envs[pair[0]] = pair[1]
 	}
-	envsString, err := json.Marshal(envs)
+	envsBytes, err := json.Marshal(envs)
 	if err != nil {
 		m.logger.Error("unable to fetch lambda environment vars")
 	}
-	return string(envsString)
+	if len(envsBytes) > m.maxEntrySize {
+		envsBytes = envsBytes[:m.maxEntrySize]
+	}
+	return string(envsBytes)
 }
 
 func (m *mapper) getHTTPInfo(attrs map[string]interface{}) *telemetry.SpanHttpInfo {
@@ -287,6 +287,19 @@ func getTransactionID(root string) string {
 	items := strings.SplitN(root, "-", 3)
 	if len(items) > 1 {
 		return items[2]
+	}
+	return ""
+}
+
+func (m *mapper) getAttrAndLimit(attrs map[string]interface{}, key string) string {
+	if value, ok := attrs[key]; ok {
+		valueStr := fmt.Sprint(value)
+		if len(valueStr) > m.maxEntrySize {
+			valueStr = valueStr[:m.maxEntrySize]
+		}
+		return valueStr
+	} else {
+		m.logger.Errorf("unable to fetch lambda %s from span", key)
 	}
 	return ""
 }

@@ -337,11 +337,46 @@ func TestTransform(t *testing.T) {
 				os.Unsetenv("IS_WARM_START")
 			},
 		},
+		{
+			testname: "end span check limits",
+			input: &tracetest.SpanStub{
+				SpanContext: trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID: traceID,
+					SpanID:  spanID,
+				}),
+				StartTime: now,
+				EndTime:   now.Add(1 * time.Second),
+				Name:      "LumigoParentSpan",
+				Attributes: []attribute.KeyValue{
+					attribute.String("event", strings.Repeat("even", 512)+"to cut"),
+					attribute.String("response", strings.Repeat("resp", 512)+"to cut"),
+				},
+			},
+			expect: telemetry.Span{
+				LambdaName:       "test",
+				LambdaType:       "function",
+				LambdaReadiness:  "warm",
+				Account:          "account-id",
+				ID:               mockLambdaContext.AwsRequestID,
+				StartedTimestamp: now.UnixMilli(),
+				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				LambdaResponse:   aws.String(strings.Repeat("resp", 512)),
+				Event:            strings.Repeat("even", 512),
+			},
+			before: func() {
+				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
+				os.Setenv("IS_WARM_START", "true")
+			},
+			after: func() {
+				os.Unsetenv("AWS_LAMBDA_FUNCTION_NAME")
+				os.Unsetenv("IS_WARM_START")
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		tc.before()
-		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New())
+		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
 		invocationStartedTimestamp := now.UnixMilli()
 		if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
 			invocationStartedTimestamp = 0
@@ -363,4 +398,16 @@ func TestTransform(t *testing.T) {
 
 		tc.after()
 	}
+}
+
+func TestTransformCheckEnvsCut(t *testing.T) {
+	span := &tracetest.SpanStub{}
+	os.Setenv("REALLY_LONG_ENV", strings.Repeat("envs", 512))
+	ctx := lambdacontext.NewContext(context.Background(), &mockLambdaContext)
+	mapper := NewMapper(ctx, span.Snapshot(), logrus.New(), 2048)
+	lumigoSpan := mapper.Transform(0)
+	if len(lumigoSpan.LambdaEnvVars) != 2048 {
+		t.Errorf("LambdaEnvVars should be of size 2048, got %d", len(lumigoSpan.LambdaEnvVars))
+	}
+	os.Unsetenv("REALLY_LONG_ENV")
 }

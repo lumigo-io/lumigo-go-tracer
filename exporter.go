@@ -58,7 +58,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 	e.encoderMu.Lock()
 	defer e.encoderMu.Unlock()
 	for _, span := range spans {
-		mapper := transform.NewMapper(e.context, span, logger)
+		mapper := transform.NewMapper(e.context, span, logger, cfg.MaxEntrySize)
 		lumigoSpan := mapper.Transform(e.lumigoStartSpan.StartedTimestamp)
 
 		if telemetry.IsEndSpan(span) {
