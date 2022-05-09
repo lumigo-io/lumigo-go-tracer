@@ -1,0 +1,8 @@
+commit_message="$(cat "$1")"
+
+if [[ "$commit_message" == major:* ]] || [[ "$commit_message" == minor:* ]] || [[ "$commit_message" == patch:* ]] || [[ "$commit_message" == no-deploy:* ]]; then
+  exit 0
+else
+  echo "The commit message must start with major: | minor: | patch: | no-deploy:"
+  exit 1
+fi
