@@ -3,7 +3,6 @@ package lumigotracer
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -61,7 +60,6 @@ func (t *tracer) Start() {
 	defer recoverWithLogs()
 
 	t.logger.Info("tracer starting")
-	os.Setenv("IS_WARM_START", "true") // nolint
 
 	traceCtx, span := t.provider.Tracer("lumigo").Start(t.ctx, "LumigoParentSpan")
 	span.SetAttributes(attribute.String("event", string(t.eventData)))
