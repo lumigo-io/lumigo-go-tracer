@@ -81,7 +81,7 @@ func TestTransform(t *testing.T) {
 			expect: telemetry.Span{
 				LambdaName:      "test",
 				LambdaType:      "function",
-				LambdaReadiness: "cold",
+				LambdaReadiness: "warm",
 				Runtime:         "go",
 				Account:         "account-id",
 				SpanInfo: telemetry.SpanInfo{
@@ -375,26 +375,28 @@ func TestTransform(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc.before()
-		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
-		invocationStartedTimestamp := now.UnixMilli()
-		if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
-			invocationStartedTimestamp = 0
-		}
-		lumigoSpan := mapper.Transform(invocationStartedTimestamp)
-		// intentionally ignore CI and Local envs
-		lumigoSpan.LambdaEnvVars = ""
-		// intentionally ignore generated LambdaContainerID
-		lumigoSpan.LambdaContainerID = ""
-		// intentionally ignore MaxFinishTime, cannot be matched
-		lumigoSpan.MaxFinishTime = 0
-		if lumigoSpan.LambdaType == "http" {
-			lumigoSpan.ID = mockLambdaContext.AwsRequestID
-		}
-		if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {
-			t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
-		}
-		tc.after()
+		t.Run(tc.testname, func(t *testing.T) {
+			tc.before()
+			mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
+			invocationStartedTimestamp := now.UnixMilli()
+			if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
+				invocationStartedTimestamp = 0
+			}
+			lumigoSpan := mapper.Transform(invocationStartedTimestamp)
+			// intentionally ignore CI and Local envs
+			lumigoSpan.LambdaEnvVars = ""
+			// intentionally ignore generated LambdaContainerID
+			lumigoSpan.LambdaContainerID = ""
+			// intentionally ignore MaxFinishTime, cannot be matched
+			lumigoSpan.MaxFinishTime = 0
+			if lumigoSpan.LambdaType == "http" {
+				lumigoSpan.ID = mockLambdaContext.AwsRequestID
+			}
+			if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {
+				t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
+			}
+			tc.after()
+		})
 	}
 }
 
