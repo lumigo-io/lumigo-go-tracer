@@ -41,9 +41,8 @@ func NewTracer(ctx context.Context, cfg Config, payload json.RawMessage) (retTra
 	}
 	retTracer.eventData = data
 
-	// TODO: maybe switch WithSyncer to WithBatcher
 	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(exporter),
+		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(newResource(ctx,
 			attribute.String("event", string(retTracer.eventData)),
 		)),
@@ -82,8 +81,9 @@ func (t *tracer) End(response []byte, lambdaErr error) {
 		t.span.SetAttributes(attribute.String("error_message", lambdaErr.Error()))
 		t.span.SetAttributes(attribute.String("error_stacktrace", takeStacktrace()))
 	}
-	t.provider.ForceFlush(t.traceCtx)
 	t.span.End()
+	t.provider.ForceFlush(t.traceCtx)
+	t.provider.Shutdown(t.traceCtx)
 
 	t.logger.Info("tracer ending")
 }
