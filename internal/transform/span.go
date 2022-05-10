@@ -101,8 +101,9 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		}
 
 		isWarmStart := os.Getenv("IS_WARM_START")
-		if isWarmStart == "" && !isProvisionConcurrencyInitialization() {
+		if isWarmStart == "true" && !isProvisionConcurrencyInitialization() {
 			lumigoSpan.LambdaReadiness = "cold"
+			os.Setenv("IS_WARM_START", "false")
 		} else {
 			lumigoSpan.LambdaReadiness = "warm"
 		}
