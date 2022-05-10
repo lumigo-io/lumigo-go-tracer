@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -37,6 +38,7 @@ func TestTransform(t *testing.T) {
 		testname string
 		input    *tracetest.SpanStub
 		expect   telemetry.Span
+		checkEnv bool
 		before   func()
 		after    func()
 	}{
@@ -60,6 +62,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 			},
@@ -78,6 +81,7 @@ func TestTransform(t *testing.T) {
 				EndTime:   now.Add(1 * time.Second),
 				Name:      "test",
 			},
+			checkEnv: true,
 			expect: telemetry.Span{
 				LambdaName:      "test",
 				LambdaType:      "function",
@@ -126,6 +130,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -159,6 +164,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -194,6 +200,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -229,6 +236,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -272,6 +280,7 @@ func TestTransform(t *testing.T) {
 					Stacktrace: "failed error",
 				},
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -363,6 +372,7 @@ func TestTransform(t *testing.T) {
 				LambdaResponse:   aws.String(strings.Repeat("resp", 512)),
 				Event:            strings.Repeat("even", 512) + "not cut",
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -382,6 +392,9 @@ func TestTransform(t *testing.T) {
 			invocationStartedTimestamp = 0
 		}
 		lumigoSpan := mapper.Transform(invocationStartedTimestamp)
+		if tc.checkEnv {
+			assert.NotEmpty(t, lumigoSpan.LambdaEnvVars)
+		}
 		// intentionally ignore CI and Local envs
 		lumigoSpan.LambdaEnvVars = ""
 		// intentionally ignore generated LambdaContainerID

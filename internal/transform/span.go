@@ -108,7 +108,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		}
 	}
 	lumigoSpan.LambdaType = lambdaType
-	if isStartSpan {
+	if lambdaType == "function" {
 		lumigoSpan.LambdaEnvVars = m.getEnvVars()
 	}
 	lambdaCtx, lambdaOk := lambdacontext.FromContext(m.ctx)
