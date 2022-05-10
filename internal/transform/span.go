@@ -94,7 +94,11 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		lumigoSpan.LambdaName = lambdaName
 		lumigoSpan.MemoryAllocated = os.Getenv("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
 		lumigoSpan.Runtime = os.Getenv("AWS_EXECUTION_ENV")
-		lumigoSpan.Event = m.getAttrAndLimit(attrs, "event")
+		if event, ok := attrs["event"]; ok {
+			lumigoSpan.Event = fmt.Sprint(event)
+		} else {
+			m.logger.Error("unable to fetch event")
+		}
 
 		isWarmStart := os.Getenv("IS_WARM_START")
 		if isWarmStart == "" && !isProvisionConcurrencyInitialization() {

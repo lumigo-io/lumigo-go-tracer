@@ -348,7 +348,7 @@ func TestTransform(t *testing.T) {
 				EndTime:   now.Add(1 * time.Second),
 				Name:      "LumigoParentSpan",
 				Attributes: []attribute.KeyValue{
-					attribute.String("event", strings.Repeat("even", 512)+"to cut"),
+					attribute.String("event", strings.Repeat("even", 512)+"not cut"),
 					attribute.String("response", strings.Repeat("resp", 512)+"to cut"),
 				},
 			},
@@ -361,7 +361,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 				LambdaResponse:   aws.String(strings.Repeat("resp", 512)),
-				Event:            strings.Repeat("even", 512),
+				Event:            strings.Repeat("even", 512) + "not cut",
 			},
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
