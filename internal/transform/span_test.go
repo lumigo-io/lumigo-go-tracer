@@ -391,11 +391,9 @@ func TestTransform(t *testing.T) {
 		if lumigoSpan.LambdaType == "http" {
 			lumigoSpan.ID = mockLambdaContext.AwsRequestID
 		}
-		// assert.Equal(t, tc.expect, lumigoSpan)
 		if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {
 			t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
 		}
-
 		tc.after()
 	}
 }
