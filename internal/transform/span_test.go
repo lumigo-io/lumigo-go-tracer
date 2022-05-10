@@ -55,7 +55,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "cold",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
@@ -84,7 +84,7 @@ func TestTransform(t *testing.T) {
 			checkEnv: true,
 			expect: telemetry.Span{
 				LambdaName:      "test",
-				LambdaType:      "function",
+				SpanType:        "function",
 				LambdaReadiness: "cold",
 				Runtime:         "go",
 				Account:         "account-id",
@@ -123,7 +123,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
@@ -156,7 +156,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				Event:            "test",
 				Account:          "account-id",
@@ -191,7 +191,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   aws.String("test2"),
 				Event:            "test",
@@ -227,7 +227,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   aws.String("test2"),
 				Event:            "test",
@@ -266,7 +266,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   nil,
 				Event:            "test",
@@ -313,7 +313,7 @@ func TestTransform(t *testing.T) {
 				},
 			},
 			expect: telemetry.Span{
-				LambdaType:       "http",
+				SpanType:         "http",
 				LambdaResponse:   nil,
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
@@ -363,7 +363,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
@@ -388,7 +388,7 @@ func TestTransform(t *testing.T) {
 		tc.before()
 		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
 		invocationStartedTimestamp := now.UnixMilli()
-		if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
+		if tc.expect.SpanType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
 			invocationStartedTimestamp = 0
 		}
 		lumigoSpan := mapper.Transform(invocationStartedTimestamp)
@@ -401,7 +401,7 @@ func TestTransform(t *testing.T) {
 		lumigoSpan.LambdaContainerID = ""
 		// intentionally ignore MaxFinishTime, cannot be matched
 		lumigoSpan.MaxFinishTime = 0
-		if lumigoSpan.LambdaType == "http" {
+		if lumigoSpan.SpanType == "http" {
 			lumigoSpan.ID = mockLambdaContext.AwsRequestID
 		}
 		if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {

@@ -86,9 +86,9 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		},
 	}
 	lambdaName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
-	lambdaType := "function"
+	spanType := "function"
 	if m.span.Name() != lambdaName && m.span.Name() != "LumigoParentSpan" {
-		lambdaType = "http"
+		spanType = "http"
 		lumigoSpan.SpanInfo.HttpInfo = m.getHTTPInfo(attrs)
 	} else {
 		lumigoSpan.LambdaName = lambdaName
@@ -107,8 +107,8 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 			lumigoSpan.LambdaReadiness = "warm"
 		}
 	}
-	lumigoSpan.LambdaType = lambdaType
-	if lambdaType == "function" {
+	lumigoSpan.SpanType = spanType
+	if spanType == "function" {
 		lumigoSpan.LambdaEnvVars = m.getEnvVars()
 	}
 	lambdaCtx, lambdaOk := lambdacontext.FromContext(m.ctx)
@@ -116,7 +116,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		containerID, _ := uuid.NewUUID()
 		lumigoSpan.LambdaContainerID = containerID.String()
 
-		if lambdaType == "http" {
+		if spanType == "http" {
 			spanID, _ := uuid.NewUUID()
 			lumigoSpan.ID = spanID.String()
 			lumigoSpan.ParentID = lambdaCtx.AwsRequestID

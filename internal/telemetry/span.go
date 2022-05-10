@@ -95,7 +95,7 @@ type Span struct {
 	LambdaEnvVars string `json:"envs"`
 
 	// LambdaType the type of the lambda function etc.
-	LambdaType string `json:"type"`
+	SpanType string `json:"type"`
 
 	// LambdaName the name of the lambda
 	LambdaName string `json:"name"`
