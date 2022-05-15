@@ -22,16 +22,18 @@ import (
 )
 
 type mapper struct {
-	ctx    context.Context
-	span   sdktrace.ReadOnlySpan
-	logger logrus.FieldLogger
+	ctx          context.Context
+	span         sdktrace.ReadOnlySpan
+	logger       logrus.FieldLogger
+	maxEntrySize int
 }
 
-func NewMapper(ctx context.Context, span sdktrace.ReadOnlySpan, logger logrus.FieldLogger) *mapper {
+func NewMapper(ctx context.Context, span sdktrace.ReadOnlySpan, logger logrus.FieldLogger, maxEntrySize int) *mapper {
 	return &mapper{
-		ctx:    ctx,
-		span:   span,
-		logger: logger,
+		ctx:          ctx,
+		span:         span,
+		logger:       logger,
+		maxEntrySize: maxEntrySize,
 	}
 }
 
@@ -69,10 +71,8 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	}
 
 	isStartSpan := telemetry.IsStartSpan(m.span)
+	isEndSpan := telemetry.IsEndSpan(m.span)
 	lumigoSpan.Region = os.Getenv("AWS_REGION")
-	lumigoSpan.MemoryAllocated = os.Getenv("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
-	lumigoSpan.Runtime = os.Getenv("AWS_EXECUTION_ENV")
-	lumigoSpan.LambdaName = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
 
 	awsRoot := getAmazonTraceID()
 	if awsRoot == "" {
@@ -85,20 +85,38 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 			Root: awsRoot,
 		},
 	}
-
-	lambdaType := "function"
-	if m.span.Name() != lumigoSpan.LambdaName && m.span.Name() != "LumigoParentSpan" {
-		lambdaType = "http"
+	lambdaName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	spanType := "function"
+	if m.span.Name() != lambdaName && m.span.Name() != "LumigoParentSpan" {
+		spanType = "http"
 		lumigoSpan.SpanInfo.HttpInfo = m.getHTTPInfo(attrs)
-	}
-	lumigoSpan.LambdaType = lambdaType
+	} else {
+		lumigoSpan.LambdaName = lambdaName
+		lumigoSpan.MemoryAllocated = os.Getenv("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+		lumigoSpan.Runtime = os.Getenv("AWS_EXECUTION_ENV")
+		if event, ok := attrs["event"]; ok {
+			lumigoSpan.Event = fmt.Sprint(event)
+		} else {
+			m.logger.Error("unable to fetch event")
+		}
 
+		isWarmStart := os.Getenv("IS_WARM_START")
+		if isWarmStart == "" && !isProvisionConcurrencyInitialization() {
+			lumigoSpan.LambdaReadiness = "cold"
+		} else {
+			lumigoSpan.LambdaReadiness = "warm"
+		}
+	}
+	lumigoSpan.SpanType = spanType
+	if spanType == "function" {
+		lumigoSpan.LambdaEnvVars = m.getEnvVars()
+	}
 	lambdaCtx, lambdaOk := lambdacontext.FromContext(m.ctx)
 	if lambdaOk {
 		containerID, _ := uuid.NewUUID()
 		lumigoSpan.LambdaContainerID = containerID.String()
 
-		if lambdaType == "http" {
+		if spanType == "http" {
 			spanID, _ := uuid.NewUUID()
 			lumigoSpan.ID = spanID.String()
 			lumigoSpan.ParentID = lambdaCtx.AwsRequestID
@@ -108,6 +126,8 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 
 		if isStartSpan {
 			lumigoSpan.ID = fmt.Sprintf("%s_started", lumigoSpan.ID)
+			deadline, _ := m.ctx.Deadline()
+			lumigoSpan.MaxFinishTime = time.Now().UnixMilli() - deadline.UnixMilli()
 		}
 
 		accountID, err := getAccountID(lambdaCtx)
@@ -116,8 +136,6 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		}
 		lumigoSpan.Account = accountID
 
-		deadline, _ := m.ctx.Deadline()
-		lumigoSpan.MaxFinishTime = time.Now().UnixMilli() - deadline.UnixMilli()
 	} else {
 		m.logger.Error("unable to fetch from LambdaContext")
 	}
@@ -127,19 +145,13 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	} else {
 		m.logger.Error("unable to fetch lumigo token from span")
 	}
-
-	if event, ok := attrs["event"]; ok {
-		lumigoSpan.Event = fmt.Sprint(event)
-	} else {
-		m.logger.Error("unable to fetch lambda event from span")
+	if isEndSpan {
+		lumigoSpan.SpanError = m.getSpanError(attrs)
+		lambdaResp := m.getAttrAndLimit(attrs, "response")
+		if lambdaResp != "" {
+			lumigoSpan.LambdaResponse = aws.String(lambdaResp)
+		}
 	}
-
-	if returnValue, ok := attrs["response"]; ok {
-		lumigoSpan.LambdaResponse = aws.String(fmt.Sprint(returnValue))
-	} else if !isStartSpan {
-		m.logger.Error("unable to fetch lambda response from span")
-	}
-
 	if transactionID := getTransactionID(awsRoot); transactionID != "" {
 		lumigoSpan.TransactionID = transactionID
 	} else {
@@ -154,18 +166,6 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	} else {
 		m.logger.Error("unable to fetch from LumigoContext")
 	}
-
-	isWarmStart := os.Getenv("IS_WARM_START")
-	if isWarmStart == "" && !isProvisionConcurrencyInitialization() {
-		lumigoSpan.LambdaReadiness = "cold"
-	} else {
-		lumigoSpan.LambdaReadiness = "warm"
-	}
-
-	if !isStartSpan {
-		lumigoSpan.SpanError = m.getSpanError(attrs)
-	}
-	lumigoSpan.LambdaEnvVars = m.getEnvVars()
 	return lumigoSpan
 }
 
@@ -203,11 +203,14 @@ func (m *mapper) getEnvVars() string {
 		pair := strings.SplitN(e, "=", 2)
 		envs[pair[0]] = pair[1]
 	}
-	envsString, err := json.Marshal(envs)
+	envsBytes, err := json.Marshal(envs)
 	if err != nil {
 		m.logger.Error("unable to fetch lambda environment vars")
 	}
-	return string(envsString)
+	if len(envsBytes) > m.maxEntrySize {
+		envsBytes = envsBytes[:m.maxEntrySize]
+	}
+	return string(envsBytes)
 }
 
 func (m *mapper) getHTTPInfo(attrs map[string]interface{}) *telemetry.SpanHttpInfo {
@@ -239,8 +242,6 @@ func (m *mapper) getHTTPInfo(attrs map[string]interface{}) *telemetry.SpanHttpIn
 
 	if reqBody, ok := attrs["http.request_body"]; ok {
 		spanHttpInfo.Request.Body = fmt.Sprint(reqBody)
-	} else {
-		m.logger.Error("unable to fetch HTTP request body")
 	}
 
 	if headers, ok := attrs["http.response_headers"]; ok {
@@ -290,6 +291,19 @@ func getTransactionID(root string) string {
 	items := strings.SplitN(root, "-", 3)
 	if len(items) > 1 {
 		return items[2]
+	}
+	return ""
+}
+
+func (m *mapper) getAttrAndLimit(attrs map[string]interface{}, key string) string {
+	if value, ok := attrs[key]; ok {
+		valueStr := fmt.Sprint(value)
+		if len(valueStr) > m.maxEntrySize {
+			valueStr = valueStr[:m.maxEntrySize]
+		}
+		return valueStr
+	} else {
+		m.logger.Errorf("unable to fetch lambda %s from span", key)
 	}
 	return ""
 }

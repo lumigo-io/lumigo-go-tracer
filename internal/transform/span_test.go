@@ -3,15 +3,16 @@ package transform
 import (
 	"context"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/google/go-cmp/cmp"
 	"github.com/lumigo-io/lumigo-go-tracer/internal/telemetry"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -37,6 +38,7 @@ func TestTransform(t *testing.T) {
 		testname string
 		input    *tracetest.SpanStub
 		expect   telemetry.Span
+		checkEnv bool
 		before   func()
 		after    func()
 	}{
@@ -53,13 +55,14 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "cold",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 			},
@@ -78,9 +81,10 @@ func TestTransform(t *testing.T) {
 				EndTime:   now.Add(1 * time.Second),
 				Name:      "test",
 			},
+			checkEnv: true,
 			expect: telemetry.Span{
 				LambdaName:      "test",
-				LambdaType:      "function",
+				SpanType:        "function",
 				LambdaReadiness: "cold",
 				Runtime:         "go",
 				Account:         "account-id",
@@ -119,13 +123,14 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -151,7 +156,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				Event:            "test",
 				Account:          "account-id",
@@ -159,6 +164,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -185,7 +191,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   aws.String("test2"),
 				Event:            "test",
@@ -194,6 +200,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -220,7 +227,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   aws.String("test2"),
 				Event:            "test",
@@ -229,6 +236,7 @@ func TestTransform(t *testing.T) {
 				StartedTimestamp: now.UnixMilli(),
 				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -258,7 +266,7 @@ func TestTransform(t *testing.T) {
 			},
 			expect: telemetry.Span{
 				LambdaName:       "test",
-				LambdaType:       "function",
+				SpanType:         "function",
 				LambdaReadiness:  "warm",
 				LambdaResponse:   nil,
 				Event:            "test",
@@ -272,6 +280,7 @@ func TestTransform(t *testing.T) {
 					Stacktrace: "failed error",
 				},
 			},
+			checkEnv: true,
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
 				os.Setenv("IS_WARM_START", "true")
@@ -304,11 +313,8 @@ func TestTransform(t *testing.T) {
 				},
 			},
 			expect: telemetry.Span{
-				LambdaName:       "test",
-				LambdaType:       "http",
-				LambdaReadiness:  "warm",
+				SpanType:         "http",
 				LambdaResponse:   nil,
-				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
 				ParentID:         mockLambdaContext.AwsRequestID,
@@ -340,28 +346,79 @@ func TestTransform(t *testing.T) {
 				os.Unsetenv("IS_WARM_START")
 			},
 		},
+		{
+			testname: "end span check limits",
+			input: &tracetest.SpanStub{
+				SpanContext: trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID: traceID,
+					SpanID:  spanID,
+				}),
+				StartTime: now,
+				EndTime:   now.Add(1 * time.Second),
+				Name:      "LumigoParentSpan",
+				Attributes: []attribute.KeyValue{
+					attribute.String("event", strings.Repeat("even", 512)+"not cut"),
+					attribute.String("response", strings.Repeat("resp", 512)+"to cut"),
+				},
+			},
+			expect: telemetry.Span{
+				LambdaName:       "test",
+				SpanType:         "function",
+				LambdaReadiness:  "warm",
+				Account:          "account-id",
+				ID:               mockLambdaContext.AwsRequestID,
+				StartedTimestamp: now.UnixMilli(),
+				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				LambdaResponse:   aws.String(strings.Repeat("resp", 512)),
+				Event:            strings.Repeat("even", 512) + "not cut",
+			},
+			checkEnv: true,
+			before: func() {
+				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
+				os.Setenv("IS_WARM_START", "true")
+			},
+			after: func() {
+				os.Unsetenv("AWS_LAMBDA_FUNCTION_NAME")
+				os.Unsetenv("IS_WARM_START")
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		tc.before()
-		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New())
+		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
 		invocationStartedTimestamp := now.UnixMilli()
-		if tc.expect.LambdaType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
+		if tc.expect.SpanType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
 			invocationStartedTimestamp = 0
 		}
 		lumigoSpan := mapper.Transform(invocationStartedTimestamp)
+		if tc.checkEnv {
+			assert.NotEmpty(t, lumigoSpan.LambdaEnvVars)
+		}
 		// intentionally ignore CI and Local envs
 		lumigoSpan.LambdaEnvVars = ""
 		// intentionally ignore generated LambdaContainerID
 		lumigoSpan.LambdaContainerID = ""
 		// intentionally ignore MaxFinishTime, cannot be matched
 		lumigoSpan.MaxFinishTime = 0
-		if lumigoSpan.LambdaType == "http" {
+		if lumigoSpan.SpanType == "http" {
 			lumigoSpan.ID = mockLambdaContext.AwsRequestID
 		}
-		if !reflect.DeepEqual(lumigoSpan, tc.expect) {
-			t.Errorf("%s: %#v != %#v", tc.testname, lumigoSpan, tc.expect)
+		if diff := cmp.Diff(tc.expect, lumigoSpan); diff != "" {
+			t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
 		}
 		tc.after()
 	}
+}
+
+func TestTransformCheckEnvsCut(t *testing.T) {
+	span := &tracetest.SpanStub{}
+	os.Setenv("REALLY_LONG_ENV", strings.Repeat("envs", 512))
+	ctx := lambdacontext.NewContext(context.Background(), &mockLambdaContext)
+	mapper := NewMapper(ctx, span.Snapshot(), logrus.New(), 2048)
+	lumigoSpan := mapper.Transform(0)
+	if len(lumigoSpan.LambdaEnvVars) != 2048 {
+		t.Errorf("LambdaEnvVars should be of size 2048, got %d", len(lumigoSpan.LambdaEnvVars))
+	}
+	os.Unsetenv("REALLY_LONG_ENV")
 }

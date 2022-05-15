@@ -285,7 +285,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 
 			if len(spans.endFileSpans) > 1 {
 				httpSpan := spans.endFileSpans[0]
-				if httpSpan.LambdaType == "http" {
+				if httpSpan.SpanType == "http" {
 					assert.NotNil(w.T(), httpSpan.SpanInfo.HttpInfo)
 					assert.Equal(w.T(), ts.URL, "http://"+httpSpan.SpanInfo.HttpInfo.Host)
 					assert.Equal(w.T(), ts.URL, "http://"+*httpSpan.SpanInfo.HttpInfo.Request.URI)
@@ -309,7 +309,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), string(inputPayload), endFuncSpan.Event)
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
 
-			if startFuncSpan.LambdaType == "http" {
+			if startFuncSpan.SpanType == "http" {
 				assert.Equal(w.T(), 200, startFuncSpan.SpanInfo.HttpInfo.Response.StatusCode)
 				assert.Equal(w.T(), `Hello, world!`, startFuncSpan.SpanInfo.HttpInfo.Response.Body)
 				assert.Contains(w.T(), `"Content-Length": "13"`, startFuncSpan.SpanInfo.HttpInfo.Response.Headers)
@@ -390,5 +390,4 @@ func (w *wrapperTestSuite) TestCheckFailWriteSpanHandler_FailLoadConfig() {
 	assert.Equal(w.T(), 1, len(dirEntries))
 
 	assert.Equal(w.T(), "balagan_stop", dirEntries[0].Name())
-
 }
