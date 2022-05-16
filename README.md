@@ -190,4 +190,3 @@ Example commit message:
 `major: upgrade telemetry sdk`
 
 After merging, a new tag will be pushed on the previous available version. IN parallel a Github Release will be pushed automatically.
-
