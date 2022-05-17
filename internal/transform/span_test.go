@@ -85,7 +85,7 @@ func TestTransform(t *testing.T) {
 			expect: telemetry.Span{
 				LambdaName:      "test",
 				SpanType:        "function",
-				LambdaReadiness: "warm",
+				LambdaReadiness: "cold",
 				Runtime:         "go",
 				Account:         "account-id",
 				SpanInfo: telemetry.SpanInfo{

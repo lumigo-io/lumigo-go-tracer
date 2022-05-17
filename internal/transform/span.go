@@ -103,7 +103,6 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		isWarmStart := os.Getenv("IS_WARM_START")
 		if isWarmStart == "" && !isProvisionConcurrencyInitialization() {
 			lumigoSpan.LambdaReadiness = "cold"
-			os.Setenv("IS_WARM_START", "true")
 		} else {
 			lumigoSpan.LambdaReadiness = "warm"
 		}
@@ -147,6 +146,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		m.logger.Error("unable to fetch lumigo token from span")
 	}
 	if isEndSpan {
+		os.Setenv("IS_WARM_START", "true")
 		lumigoSpan.SpanError = m.getSpanError(attrs)
 		lambdaResp := m.getAttrAndLimit(attrs, "response")
 		if lambdaResp != "" {

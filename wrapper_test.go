@@ -258,6 +258,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 		},
 	}
 	testContext := lambdacontext.NewContext(mockContext, &mockLambdaContext)
+	counter := 0
 	for i, testCase := range testCases {
 		w.T().Run(fmt.Sprintf("handlerTestCase[%d] %s", i, testCase.name), func(t *testing.T) {
 
@@ -282,6 +283,11 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", startFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), startFuncSpan.Event)
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
+			if counter > 0 {
+				assert.Equal(w.T(), "warm", startFuncSpan.LambdaReadiness)
+			} else {
+				assert.Equal(w.T(), "cold", startFuncSpan.LambdaReadiness)
+			}
 
 			if len(spans.endFileSpans) > 1 {
 				httpSpan := spans.endFileSpans[0]
@@ -295,6 +301,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 					assert.Contains(w.T(), httpSpan.SpanInfo.HttpInfo.Request.Headers, `"Agent":"test"`)
 				}
 			}
+			// endFuncSpan.
 
 			endFuncSpan := spans.endFileSpans[len(spans.endFileSpans)-1]
 			assert.Equal(w.T(), "account-id", endFuncSpan.Account)
@@ -307,6 +314,13 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), os.Getenv("AWS_REGION"), endFuncSpan.Region)
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", endFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), endFuncSpan.Event)
+			if counter > 0 {
+				assert.Equal(w.T(), "warm", endFuncSpan.LambdaReadiness)
+			} else {
+				assert.Equal(w.T(), "cold", endFuncSpan.LambdaReadiness)
+			}
+			counter++
+
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
 
 			if startFuncSpan.SpanType == "http" {
