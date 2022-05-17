@@ -56,6 +56,7 @@ func (w *wrapperTestSuite) SetupTest() {
 	_ = os.Setenv("AWS_LAMBDA_LOG_GROUP_NAME", "/aws/lambda/helloworld-37")
 	_ = os.Setenv("AWS_EXECUTION_ENV", "go")
 	_ = os.Setenv("_X_AMZN_TRACE_ID", "Root=1-5759e988-bd862e3fe1be46a994272793;Parent=53995c3f42cd8ad8;Sampled=1")
+	os.Unsetenv("IS_WARM_START")
 }
 
 func (w *wrapperTestSuite) TearDownTest() {
@@ -161,6 +162,8 @@ func (w *wrapperTestSuite) TestLambdaHandlerSignatures() {
 			},
 		},
 	}
+	// setup
+
 	// test invocation via a Handler
 	for i, testCase := range testCases {
 		testCase := testCase
@@ -258,7 +261,6 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 		},
 	}
 	testContext := lambdacontext.NewContext(mockContext, &mockLambdaContext)
-	counter := 0
 	for i, testCase := range testCases {
 		w.T().Run(fmt.Sprintf("handlerTestCase[%d] %s", i, testCase.name), func(t *testing.T) {
 
@@ -283,7 +285,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", startFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), startFuncSpan.Event)
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
-			if counter > 0 {
+			if i > 0 { // check if second test
 				assert.Equal(w.T(), "warm", startFuncSpan.LambdaReadiness)
 			} else {
 				assert.Equal(w.T(), "cold", startFuncSpan.LambdaReadiness)
@@ -314,12 +316,11 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), os.Getenv("AWS_REGION"), endFuncSpan.Region)
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", endFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), endFuncSpan.Event)
-			if counter > 0 {
+			if i > 0 { // check if second test
 				assert.Equal(w.T(), "warm", endFuncSpan.LambdaReadiness)
 			} else {
 				assert.Equal(w.T(), "cold", endFuncSpan.LambdaReadiness)
 			}
-			counter++
 
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
 

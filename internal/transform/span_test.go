@@ -68,6 +68,7 @@ func TestTransform(t *testing.T) {
 			},
 			after: func() {
 				os.Unsetenv("AWS_LAMBDA_FUNCTION_NAME")
+				os.Unsetenv("IS_WARM_START")
 			},
 		},
 		{
@@ -108,6 +109,7 @@ func TestTransform(t *testing.T) {
 				os.Unsetenv("AWS_EXECUTION_ENV")
 				os.Unsetenv("AWS_LAMBDA_LOG_STREAM_NAME")
 				os.Unsetenv("AWS_LAMBDA_LOG_GROUP_NAME")
+				os.Unsetenv("IS_WARM_START")
 			},
 		},
 		{
