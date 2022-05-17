@@ -80,7 +80,7 @@ Then the wrapping will look like this:
 wrappedHandler := lumigotracer.WrapHandler(HandleRequest, &lumigotracer.Config{})
 ```
 
-### HTTP Tracking
+### HTTP Tracking ![Beta](https://img.shields.io/badge/-Beta-red) 
 
 For tracing AWS SDK v2.0 calls check the following example:
 
@@ -190,3 +190,4 @@ Example commit message:
 `major: upgrade telemetry sdk`
 
 After merging, a new tag will be pushed on the previous available version. IN parallel a Github Release will be pushed automatically.
+
