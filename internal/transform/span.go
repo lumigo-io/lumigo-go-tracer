@@ -309,7 +309,7 @@ func (m *mapper) getAttrAndLimit(attrs map[string]interface{}, key string) strin
 	return ""
 }
 
-// backward compatability for time.Now().UnixMilli() in go 1.17 and earlier
+// backward compatability for time.Now().UnixMilli() in go 1.16 and earlier
 func unixMilli(t time.Time) int64 {
 	return t.UnixNano() / int64(time.Millisecond)
 }

@@ -274,8 +274,8 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
-				StartedTimestamp: unixMilli(now.UnixMilli(),
-				EndedTimestamp:   unixMilli(now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 				SpanError: &telemetry.SpanError{
 					Type:       "TestError",
 					Message:    "failed error",
@@ -320,8 +320,8 @@ func TestTransform(t *testing.T) {
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
 				ParentID:         mockLambdaContext.AwsRequestID,
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 				SpanInfo: telemetry.SpanInfo{
 					HttpInfo: &telemetry.SpanHttpInfo{
 						Host: "s3.aws.com",
@@ -369,8 +369,8 @@ func TestTransform(t *testing.T) {
 				LambdaReadiness:  "warm",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 				LambdaResponse:   aws.String(strings.Repeat("resp", 512)),
 				Event:            strings.Repeat("even", 512) + "not cut",
 			},
@@ -389,7 +389,7 @@ func TestTransform(t *testing.T) {
 	for _, tc := range testcases {
 		tc.before()
 		mapper := NewMapper(ctx, tc.input.Snapshot(), logrus.New(), 2048)
-		invocationStartedTimestamp := now.UnixMilli()
+		invocationStartedTimestamp := unixMilli(now)
 		if tc.expect.SpanType == "function" && strings.HasSuffix(tc.expect.ID, "_started") {
 			invocationStartedTimestamp = 0
 		}

@@ -129,7 +129,7 @@ func (e *exporterTestSuite) TestExportSpans() {
 	lumigoStart := container.startFileSpans[0]
 	assert.Equal(e.T(), mockLambdaContext.AwsRequestID+"_started", lumigoStart.ID)
 	assert.Equal(e.T(), "account-id", lumigoStart.Account)
-	assert.Equal(e.T(), lumigoStart.StartedTimestamp, startSpan.StartTime.UnixMilli())
+	assert.Equal(e.T(), lumigoStart.StartedTimestamp, unixMilli(startSpan.StartTime))
 
 	lumigoEnd := container.endFileSpans[0]
 	event := fmt.Sprint(endSpan.Attributes[0].Value.AsString())
@@ -229,4 +229,9 @@ func deleteAllFiles() error {
 		}
 	}
 	return nil
+}
+
+// backward compatability for time.Now().UnixMilli() in go 1.16 and earlier
+func unixMilli(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond)
 }
