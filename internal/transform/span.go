@@ -61,13 +61,13 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		attrs["m.span.kind"] = strings.ToLower(m.span.SpanKind().String())
 	}
 
-	startTime := m.span.StartTime().UnixMilli()
+	startTime := unixMilli(m.span.StartTime())
 	if telemetry.IsEndSpan(m.span) {
 		startTime = invocationStartedTimestamp
 	}
 	lumigoSpan := telemetry.Span{
 		StartedTimestamp: startTime,
-		EndedTimestamp:   m.span.EndTime().UnixMilli(),
+		EndedTimestamp:   unixMilli(m.span.EndTime()),
 	}
 
 	isStartSpan := telemetry.IsStartSpan(m.span)
@@ -127,7 +127,7 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 		if isStartSpan {
 			lumigoSpan.ID = fmt.Sprintf("%s_started", lumigoSpan.ID)
 			deadline, _ := m.ctx.Deadline()
-			lumigoSpan.MaxFinishTime = time.Now().UnixMilli() - deadline.UnixMilli()
+			lumigoSpan.MaxFinishTime = unixMilli(time.Now()) - unixMilli(deadline)
 		}
 
 		accountID, err := getAccountID(lambdaCtx)
@@ -307,4 +307,9 @@ func (m *mapper) getAttrAndLimit(attrs map[string]interface{}, key string) strin
 		m.logger.Errorf("unable to fetch lambda %s from span", key)
 	}
 	return ""
+}
+
+// backward compatability for time.Now().UnixMilli() in go 1.16 and earlier
+func unixMilli(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond)
 }
