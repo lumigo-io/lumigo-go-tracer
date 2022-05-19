@@ -1,6 +1,6 @@
 module github.com/lumigo-io/lumigo-go-tracer
 
-go 1.17
+go 1.16
 
 require (
 	github.com/aws/aws-lambda-go v1.27.0

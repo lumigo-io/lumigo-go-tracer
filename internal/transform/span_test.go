@@ -59,8 +59,8 @@ func TestTransform(t *testing.T) {
 				LambdaReadiness:  "cold",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			checkEnv: true,
 			before: func() {
@@ -95,8 +95,8 @@ func TestTransform(t *testing.T) {
 					TraceID:       telemetry.SpanTraceRoot{},
 				},
 				ID:               mockLambdaContext.AwsRequestID + "_started",
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			before: func() {
 				os.Setenv("AWS_LAMBDA_FUNCTION_NAME", "test")
@@ -129,8 +129,8 @@ func TestTransform(t *testing.T) {
 				LambdaReadiness:  "warm",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			checkEnv: true,
 			before: func() {
@@ -163,8 +163,8 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID + "_started",
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			checkEnv: true,
 			before: func() {
@@ -199,8 +199,8 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			checkEnv: true,
 			before: func() {
@@ -235,8 +235,8 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second)),
 			},
 			checkEnv: true,
 			before: func() {
@@ -274,8 +274,8 @@ func TestTransform(t *testing.T) {
 				Event:            "test",
 				Account:          "account-id",
 				ID:               mockLambdaContext.AwsRequestID,
-				StartedTimestamp: now.UnixMilli(),
-				EndedTimestamp:   now.Add(1 * time.Second).UnixMilli(),
+				StartedTimestamp: unixMilli(now.UnixMilli(),
+				EndedTimestamp:   unixMilli(now.Add(1 * time.Second).UnixMilli(),
 				SpanError: &telemetry.SpanError{
 					Type:       "TestError",
 					Message:    "failed error",
