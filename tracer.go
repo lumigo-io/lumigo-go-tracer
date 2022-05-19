@@ -83,7 +83,10 @@ func (t *tracer) End(response []byte, lambdaErr error) {
 	}
 	t.span.End()
 	t.provider.ForceFlush(t.traceCtx)
-	t.provider.Shutdown(t.traceCtx)
 
-	t.logger.Info("tracer ending")
+	if err := t.provider.Shutdown(t.traceCtx); err != nil {
+		t.logger.WithError(err).Error("failed to shutdown tracer")
+	} else {
+		t.logger.Info("tracer shutdown successfully")
+	}
 }
