@@ -56,6 +56,7 @@ func (w *wrapperTestSuite) SetupTest() {
 	_ = os.Setenv("AWS_LAMBDA_LOG_GROUP_NAME", "/aws/lambda/helloworld-37")
 	_ = os.Setenv("AWS_EXECUTION_ENV", "go")
 	_ = os.Setenv("_X_AMZN_TRACE_ID", "Root=1-5759e988-bd862e3fe1be46a994272793;Parent=53995c3f42cd8ad8;Sampled=1")
+	os.Unsetenv("IS_WARM_START")
 }
 
 func (w *wrapperTestSuite) TearDownTest() {
@@ -161,6 +162,8 @@ func (w *wrapperTestSuite) TestLambdaHandlerSignatures() {
 			},
 		},
 	}
+	// setup
+
 	// test invocation via a Handler
 	for i, testCase := range testCases {
 		testCase := testCase
@@ -282,6 +285,11 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", startFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), startFuncSpan.Event)
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
+			if i > 0 { // check if second test
+				assert.Equal(w.T(), "warm", startFuncSpan.LambdaReadiness)
+			} else {
+				assert.Equal(w.T(), "cold", startFuncSpan.LambdaReadiness)
+			}
 
 			if len(spans.endFileSpans) > 1 {
 				httpSpan := spans.endFileSpans[0]
@@ -295,6 +303,7 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 					assert.Contains(w.T(), httpSpan.SpanInfo.HttpInfo.Request.Headers, `"Agent":"test"`)
 				}
 			}
+			// endFuncSpan.
 
 			endFuncSpan := spans.endFileSpans[len(spans.endFileSpans)-1]
 			assert.Equal(w.T(), "account-id", endFuncSpan.Account)
@@ -307,6 +316,12 @@ func (w *wrapperTestSuite) TestLambdaHandlerE2ELocal() {
 			assert.Equal(w.T(), os.Getenv("AWS_REGION"), endFuncSpan.Region)
 			assert.Equal(w.T(), "bd862e3fe1be46a994272793", endFuncSpan.TransactionID)
 			assert.Equal(w.T(), string(inputPayload), endFuncSpan.Event)
+			if i > 0 { // check if second test
+				assert.Equal(w.T(), "warm", endFuncSpan.LambdaReadiness)
+			} else {
+				assert.Equal(w.T(), "cold", endFuncSpan.LambdaReadiness)
+			}
+
 			assert.Equal(w.T(), version, startFuncSpan.SpanInfo.TracerVersion.Version)
 
 			if startFuncSpan.SpanType == "http" {
