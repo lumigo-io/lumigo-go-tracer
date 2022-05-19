@@ -408,8 +408,8 @@ func TestTransform(t *testing.T) {
 			t.Errorf("%s mismatch (-want +got):\n%s", tc.testname, diff)
 		}
 		tc.after()
+		os.Unsetenv("REALLY_LONG_ENV")
 	}
-	os.Unsetenv("REALLY_LONG_ENV")
 }
 
 func TestTransformCheckEnvsCut(t *testing.T) {
