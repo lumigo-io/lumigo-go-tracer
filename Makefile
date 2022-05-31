@@ -119,6 +119,7 @@ setup:
 .PHONY: test
 ## test: tests all packages
 test:
+	@echo $(GO)
 	@echo Running tests
 	$(GO) test -v $(GO_TEST_FLAGS) ./...
 
