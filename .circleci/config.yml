@@ -25,6 +25,15 @@ jobs:
     steps:
     - checkout
     - *restore_cache
+    - run: go install golang.org/dl/go1.16@latest
+    - run: go1.16 download
+    - run: go install golang.org/dl/go1.18@latest
+    - run: go1.18 download
+    - run: export GO=go1.16
+    - run: make checks
+    - run: export GO=go1.17
+    - run: make checks
+    - run: export GO=go1.18
     - run: make checks
     - run: make upload-codecov
     - *save_cache
