@@ -120,6 +120,7 @@ setup:
 ## test: tests all packages
 test:
 	@echo Running tests
+	$(GO) version
 	$(GO) test -v $(GO_TEST_FLAGS) ./...
 
 .PHONY: upload-codecov
@@ -132,3 +133,4 @@ upload-codecov:
 help:
 	@echo "Usage:"
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
+
