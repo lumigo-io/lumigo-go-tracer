@@ -119,8 +119,7 @@ setup:
 .PHONY: test
 ## test: tests all packages
 test:
-	@echo $(GO) 
-	@echo Running tests
+	@echo Running tests for version $(GO) 
 	$(GO) test -v $(GO_TEST_FLAGS) ./...
 
 .PHONY: upload-codecov
