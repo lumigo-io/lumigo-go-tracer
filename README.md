@@ -7,6 +7,8 @@
 
 This is lumigo/lumigo-go-tracer, Lumigo's Golang tracer for distributed tracing and monitoring.
 
+Supported Go versions: 1.16, 1.17 and 1.18
+
 ## Installation
 
 `lumigo-go-tracer` can be installed like any other Go library through `go get`:
