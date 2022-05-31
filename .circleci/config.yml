@@ -29,7 +29,7 @@ jobs:
     - run: go1.16 download
     - run: go install golang.org/dl/go1.18@latest
     - run: go1.18 download
-    - run: export GO=go && make checks
+    - run: export GO=go && make checks # runs test for go1.17
     - run: export GO=go1.16 && make checks
     - run: export GO=go1.18 && make checks
     - run: make upload-codecov
