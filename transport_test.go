@@ -114,11 +114,11 @@ func TestTransport(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		defer func() { GetTracerProvider = otel.GetTracerProvider }()
+		defer func() { getTracerProvider = otel.GetTracerProvider }()
 		t.Run(tc.testname, func(t *testing.T) {
 			spanMock := &mySpan{}
 			lTrans := NewTransport(http.DefaultTransport)
-			GetTracerProvider = func() trace.TracerProvider { return &provider{s: spanMock} }
+			getTracerProvider = func() trace.TracerProvider { return &provider{s: spanMock} }
 			c := http.Client{Transport: lTrans}
 			res, err := c.Post(ts.URL, "application/json", bytes.NewReader([]byte("post body")))
 			if err != nil {
@@ -170,8 +170,8 @@ func TestTransportBodyReadError(t *testing.T) {
 	assert.NoError(t, err)
 	spanMock := &mySpan{}
 	lTrans := NewTransport(http.DefaultTransport)
-	defer func() { GetTracerProvider = otel.GetTracerProvider }()
-	GetTracerProvider = func() trace.TracerProvider { return &provider{s: spanMock} }
+	defer func() { getTracerProvider = otel.GetTracerProvider }()
+	getTracerProvider = func() trace.TracerProvider { return &provider{s: spanMock} }
 	c := http.Client{Transport: lTrans}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("Hello, world!")); err != nil {

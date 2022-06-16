@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var GetTracerProvider = otel.GetTracerProvider // For mocking in unittests
+var getTracerProvider = otel.GetTracerProvider // For mocking in unittests
 
 type Transport struct {
 	rt         http.RoundTripper
@@ -30,7 +30,7 @@ func NewTransport(transport http.RoundTripper) *Transport {
 
 func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	logger.Info("Starting RoundTrip")
-	provider := GetTracerProvider()
+	provider := getTracerProvider()
 	traceCtx, span := provider.Tracer("lumigo").Start(req.Context(), "HttpSpan")
 	defer span.End()
 
