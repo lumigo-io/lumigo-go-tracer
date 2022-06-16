@@ -14,22 +14,24 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+var getTracerProvider = otel.GetTracerProvider // For mocking in unittests
+
 type Transport struct {
 	rt         http.RoundTripper
-	provider   trace.TracerProvider
 	propagator propagation.TextMapPropagator
 }
 
 func NewTransport(transport http.RoundTripper) *Transport {
 	return &Transport{
 		rt:         transport,
-		provider:   otel.GetTracerProvider(),
 		propagator: otel.GetTextMapPropagator(),
 	}
 }
 
 func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
-	traceCtx, span := t.provider.Tracer("lumigo").Start(req.Context(), "HttpSpan")
+	logger.Info("Starting RoundTrip")
+	provider := getTracerProvider()
+	traceCtx, span := provider.Tracer("lumigo").Start(req.Context(), "HttpSpan")
 	defer span.End()
 
 	req = req.WithContext(traceCtx)
@@ -45,6 +47,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
 	span.SetStatus(semconv.SpanStatusFromHTTPStatusCode(resp.StatusCode))
 	resp = addResponseDataToSpanAndWrap(resp, span)
+	logger.Info("Finished RoundTrip")
 	return resp, err
 }
 
