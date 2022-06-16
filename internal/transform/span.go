@@ -52,10 +52,10 @@ func (m *mapper) Transform(invocationStartedTimestamp int64) telemetry.Span {
 	}
 	for _, kv := range m.span.Attributes() {
 		attrs[string(kv.Key)] = kv.Value.AsInterface()
-		m.logger.WithField(string(kv.Key), kv.Value.AsInterface()).Info()
+		m.logger.WithField(string(kv.Key), kv.Value.AsInterface()).Info("span.Attributes() in Transform")
 	}
 
-	m.logger.WithFields(attrs).Info("span attributes")
+	m.logger.WithFields(attrs).Info("span attributes in Transform")
 
 	if m.span.SpanKind() != apitrace.SpanKindUnspecified {
 		attrs["m.span.kind"] = strings.ToLower(m.span.SpanKind().String())
