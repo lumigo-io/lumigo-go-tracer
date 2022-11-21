@@ -5,8 +5,8 @@ executors:
     - image: circleci/golang:1.17
 
 orbs:
-  gh: circleci/github-cli@1.0
-  lumigo-orb: lumigo/lumigo-orb@volatile
+  github-cli: &github_cli_version circleci/github-cli@1.0
+  lumigo-orb: &lumigo_orb_version lumigo/lumigo-orb@volatile
 
 aliases:
 - &restore_cache
@@ -18,11 +18,83 @@ aliases:
     paths:
       - "/go/pkg/mod"
 
+workflows:
+  ci-build:
+    jobs:
+    - lumigo-orb/print_orb_versions:
+        github_cli_version: *github_cli_version
+        lumigo_orb_version: *lumigo_orb_version
+    - test:
+        filters:
+          branches:
+            ignore: master
+    - lumigo-orb/is_environment_available:
+        filters:
+          branches:
+            ignore: master
+    - lumigo-orb/be-deploy:
+        requires:
+          - lumigo-orb/is_environment_available
+    - lumigo-orb/integration-test-prep:
+        deploy_spec: default
+        requires:
+          - lumigo-orb/be-deploy
+    - lumigo-orb/integration-test-limited-flows:
+        deploy_spec: default
+        tests_spec: testNormal
+        requires:
+          - lumigo-orb/integration-test-prep
+    - lumigo-orb/integration-test-parallel:
+        deploy_spec: default
+        tests_spec: testNormal
+        requires:
+          - lumigo-orb/integration-test-limited-flows
+    - lumigo-orb/workflow-completed-successfully:
+        requires:
+          - test
+          - lumigo-orb/integration-test-parallel
+
+  master-build:
+    jobs:
+    - test:
+        filters:
+          branches:
+            only:
+            - master
+    - create-push-release:
+        requires:
+          - test
+
+commands:
+  checkout_utils:
+    description: "Checkout various utilities"
+    steps:
+      - configure_ssh_for_github
+      - run:
+          name: Clone utils repository
+          command: |
+            cd ..
+            git clone git@github.com:lumigo-io/utils.git
+
+            # attempt to checkout the matching branch if it exists
+            cd utils
+            git checkout "$CIRCLE_BRANCH" || true
+
+  configure_ssh_for_github:
+    description: Configure SSH host checking for GitHub
+    steps:
+      - run:
+          name: Configure SSH host checking for GitHub
+          command: |
+            mkdir -p ~/.ssh
+            echo -e "Host github.com\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+
 jobs:
   test:
     executor:
       name: default
     steps:
+    - checkout_utils
     - checkout
     - *restore_cache
     - run: go install golang.org/dl/go1.16@latest
@@ -34,47 +106,12 @@ jobs:
     - run: export GO=go1.18 && make checks
     - run: make upload-codecov
     - *save_cache
-  
+
   create-push-release:
     executor:
       name: default
     steps:
-    - gh/setup
+    - github-cli/setup
     - checkout
     - run: |
-        make release 
-
-workflows:
-  ci-build:
-    jobs:
-    - test:
-        filters:
-          branches:
-            ignore: master
-    - lumigo-orb/be-deploy:
-        filters:
-          branches:
-            ignore: master
-        requires:
-          - test
-    - lumigo-orb/integration-test:
-        deploy_spec: default
-        tests_spec: testNormal
-        filters:
-          branches:
-            ignore: master
-        requires:
-          - lumigo-orb/be-deploy
-
-  master-build:
-    jobs:
-    - test:
-        filters:
-          branches:
-            only:
-            - master
-    - create-push-release:
-        filters:
-          branches:
-            only:
-            - master
+        make release
