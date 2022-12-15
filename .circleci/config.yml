@@ -19,15 +19,12 @@ aliases:
       - "/go/pkg/mod"
 
 workflows:
-  ci-build:
+  test-deploy:
     jobs:
     - lumigo-orb/print_orb_versions:
         github_cli_version: *github_cli_version
         lumigo_orb_version: *lumigo_orb_version
-    - test:
-        filters:
-          branches:
-            ignore: master
+    - test
     - lumigo-orb/is_environment_available:
         filters:
           branches:
@@ -36,17 +33,12 @@ workflows:
         requires:
           - lumigo-orb/is_environment_available
     - lumigo-orb/integration-test-prep:
-        deploy_spec: default
         requires:
           - lumigo-orb/be-deploy
     - lumigo-orb/integration-test-limited-flows:
-        deploy_spec: default
-        tests_spec: testNormal
         requires:
           - lumigo-orb/integration-test-prep
     - lumigo-orb/integration-test-parallel:
-        deploy_spec: default
-        tests_spec: testNormal
         requires:
           - lumigo-orb/integration-test-limited-flows
     - lumigo-orb/workflow-completed-successfully:
@@ -54,48 +46,21 @@ workflows:
           - test
           - lumigo-orb/integration-test-parallel
 
-  master-build:
-    jobs:
-    - test:
+    - create-push-release:
         filters:
           branches:
             only:
             - master
-    - create-push-release:
         requires:
           - test
-
-commands:
-  checkout_utils:
-    description: "Checkout various utilities"
-    steps:
-      - configure_ssh_for_github
-      - run:
-          name: Clone utils repository
-          command: |
-            cd ..
-            git clone git@github.com:lumigo-io/utils.git
-
-            # attempt to checkout the matching branch if it exists
-            cd utils
-            git checkout "$CIRCLE_BRANCH" || true
-
-  configure_ssh_for_github:
-    description: Configure SSH host checking for GitHub
-    steps:
-      - run:
-          name: Configure SSH host checking for GitHub
-          command: |
-            mkdir -p ~/.ssh
-            echo -e "Host github.com\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
 jobs:
   test:
     executor:
       name: default
     steps:
-    - checkout_utils
     - checkout
+    - lumigo-orb/checkout_utils
     - *restore_cache
     - run: go install golang.org/dl/go1.16@latest
     - run: go1.16 download
@@ -113,5 +78,6 @@ jobs:
     steps:
     - github-cli/setup
     - checkout
+    - lumigo-orb/checkout_utils
     - run: |
         make release
