@@ -6,7 +6,7 @@ executors:
 
 orbs:
   github-cli: &github_cli_version circleci/github-cli@1.0
-  lumigo-orb: &lumigo_orb_version lumigo/lumigo-orb@dev:eb864fa
+  lumigo-orb: &lumigo_orb_version lumigo/lumigo-orb@dev:834866c
 
 aliases:
 - &restore_cache
