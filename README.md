@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master.svg?style=svg&circle-token=57743ad287dcba62c92f315898af5d20ac3f1569)](https://circleci.com/gh/lumigo-io/lumigo-go-tracer/tree/master)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/lumigo-io/lumigo-go-tracer/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/lumigo-io/lumigo-go-tracer/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/lumigo-io/lumigo-go-tracer)](https://goreportcard.com/report/github.com/lumigo-io/lumigo-go-tracer)
 [![codecov](https://codecov.io/gh/lumigo-io/lumigo-go-tracer/branch/master/graph/badge.svg?token=BOtQ9Myp1t)](https://codecov.io/gh/lumigo-io/lumigo-go-tracer)
 [![GoDoc](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer?status.svg)](https://godoc.org/github.com/lumigo-io/lumigo-go-tracer)
